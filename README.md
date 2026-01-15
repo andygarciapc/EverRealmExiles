@@ -4,7 +4,7 @@ EverRealm Exiles is a medieval fantasy **extraction RPG** where players venture 
 
 Built in Unity, the game blends tactical combat, high-risk exploration, and persistent progression in a dark fantasy setting.
 
----
+
 
 ## 🎮 Game Concept
 
@@ -17,7 +17,7 @@ Players take the role of **Exiles**, warriors and adventurers cast into unstable
 
 Survival and smart decision-making are just as important as combat skill.
 
----
+
 
 ## 🧭 Core Pillars
 
@@ -33,7 +33,7 @@ Survival and smart decision-making are just as important as combat skill.
 - **Persistent Progression**  
   Characters, gear, and upgrades persist between runs.
 
----
+
 
 ## 🛠 Tech Stack
 
@@ -41,14 +41,14 @@ Survival and smart decision-making are just as important as combat skill.
 - **Language:** C#
 - **Target Platforms:** PC (initially)
 
----
+
 
 ## 🚧 Development Status
 
 EverRealm Exiles is currently in **early development**.  
 This repository contains the core Unity project and will evolve as core systems are implemented.
 
----
+
 
 ## 📁 Project Structure
 
@@ -56,7 +56,7 @@ This repository contains the core Unity project and will evolve as core systems 
 - `Packages/` – Unity packages
 - `ProjectSettings/` – Unity configuration
 
----
+
 
 ## 🗺 Roadmap (High Level)
 
@@ -67,14 +67,14 @@ This repository contains the core Unity project and will evolve as core systems 
 - Enemy AI
 - Multiplayer (long-term goal)
 
----
+
 
 ## 📜 License
 
 This project is currently **private and proprietary**.  
 All rights reserved unless otherwise stated.
 
----
+
 
 ## 👑 Credits
 
