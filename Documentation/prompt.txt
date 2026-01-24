@@ -1,0 +1,16 @@
+Hey ChatGPT, I am designing an extraction based game in Unity.
+
+Here is a more in-depth explanation of my game:
+EverRealm Exiles is a medieval extraction voxel game that will thrust the player into different types of randomly generated maps in order to loot, kill, and extract.
+
+
+What happens before a run?
+- manage inventory
+- setup kit
+What happens in the first 10 minutes of a run?
+- get spawned in a random part of the map
+- search around and loot
+- PvPvE
+- stay alive and find extract
+What happens after run?
+- manage inventory
