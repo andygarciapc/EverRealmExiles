@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8bd97217412853b4faae26aa95bb6157, type: 3}
+  m_Name: WorldGenSettings
+  m_EditorClassIdentifier: Assembly-CSharp::EverRealm.Exiles.Data.WorldGenSettings
+  Seed: 42
+  ChunkRadius: 8
+  HeightMin: 28
+  HeightMax: 48
+  NoiseScale: 0.04
+  NoiseOctaves: 4
+  NoisePersistence: 0.5
+  NoiseLacunarity: 2
+  LoadRadius: 5
+  UnloadRadius: 7
+  MeshPerFrame: 3
