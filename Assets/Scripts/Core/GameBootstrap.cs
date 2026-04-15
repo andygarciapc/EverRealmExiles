@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using EverRealm.Exiles.Data;
 
 namespace EverRealm.Exiles.Core
 {
@@ -16,6 +17,17 @@ namespace EverRealm.Exiles.Core
 
         private StashManager _stash;
         public StashManager Stash => _stash ??= GetComponent<StashManager>();
+
+        /// <summary>
+        /// The biome selected for the next run. Set by the Play tab, read by WorldManager.
+        /// Runtime-only — the BiomeId is persisted in SaveData via StashManager.
+        /// </summary>
+        public BiomeDefinition SelectedBiome { get; private set; }
+
+        public void SetSelectedBiome(BiomeDefinition biome)
+        {
+            SelectedBiome = biome;
+        }
 
         private void Awake()
         {

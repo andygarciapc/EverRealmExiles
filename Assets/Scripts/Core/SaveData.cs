@@ -15,6 +15,14 @@ namespace EverRealm.Exiles.Core
         /// <summary>WeaponId of the weapon chosen for the next run.</summary>
         public string SelectedWeaponId = "";
 
+        /// <summary>BiomeId of the biome chosen for the next run.</summary>
+        public string SelectedBiomeId = "";
+
+        // ----- Player profile -----
+        public string PlayerName = "Exile";
+        public int PlayerLevel = 1;
+        public int Currency;
+
         // ----- Lifetime statistics -----
         public int TotalRuns;
         public int TotalExtractions;

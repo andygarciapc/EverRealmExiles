@@ -4,12 +4,12 @@ using EverRealm.Exiles.Core;
 namespace EverRealm.Exiles.UI
 {
     /// <summary>
-    /// Lives in the MainMenu scene. On start, instantiates the hub UI
+    /// Lives in the MainMenu scene. On start, finds or instantiates the main menu UI
     /// and populates it from the persistent <see cref="StashManager"/>.
     /// </summary>
     public sealed class MainMenuController : MonoBehaviour
     {
-        [SerializeField] private GameObject _hubUiPrefab;
+        [SerializeField] private GameObject _mainMenuUiPrefab;
 
         private void Start()
         {
@@ -25,29 +25,33 @@ namespace EverRealm.Exiles.UI
 
             GameBootstrap.Instance.SetState(GameState.Hideout);
 
-            if (_hubUiPrefab == null)
-            {
-                Debug.LogError("[MainMenuController] _hubUiPrefab is not assigned.");
-                return;
-            }
+            // First, try to find a MainMenuUI already in the scene (placed by editor setup).
+            var ui = FindAnyObjectByType<MainMenuUI>();
+            Debug.Log($"[MainMenuController] FindAnyObjectByType<MainMenuUI>() = {(ui != null ? ui.gameObject.name : "NULL")}");
 
-            // Destroy any leftover HideoutUI before instantiating a fresh one.
-            var existing = FindAnyObjectByType<HideoutUI>();
-            if (existing != null)
-                Destroy(existing.gameObject);
-
-            var go = Instantiate(_hubUiPrefab);
-            var ui = go.GetComponent<HideoutUI>();
+            // If not found, instantiate from prefab.
             if (ui == null)
             {
-                Debug.LogError("[MainMenuController] HideoutUI component not found on prefab.");
-                return;
+                if (_mainMenuUiPrefab == null)
+                {
+                    Debug.LogError("[MainMenuController] _mainMenuUiPrefab is not assigned and no MainMenuUI exists in the scene.");
+                    return;
+                }
+
+                var go = Instantiate(_mainMenuUiPrefab);
+                ui = go.GetComponent<MainMenuUI>();
+                if (ui == null)
+                {
+                    Debug.LogError("[MainMenuController] MainMenuUI component not found on prefab.");
+                    return;
+                }
             }
 
             var stash = GameBootstrap.Instance.Stash;
             if (stash == null)
-                Debug.LogWarning("[MainMenuController] StashManager is null — hub will show without save data.");
+                Debug.LogWarning("[MainMenuController] StashManager is null — menu will show without save data.");
 
+            Debug.Log("[MainMenuController] Calling MainMenuUI.Show()");
             ui.Show(stash);
         }
     }

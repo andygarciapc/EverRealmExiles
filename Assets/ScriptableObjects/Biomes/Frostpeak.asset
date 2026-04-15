@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e251553485981344887823fca0c6a95c, type: 3}
+  m_Name: Frostpeak
+  m_EditorClassIdentifier: Assembly-CSharp::EverRealm.Exiles.Data.BiomeDefinition
+  BiomeId: frostpeak
+  BiomeName: Frostpeak
+  Description: Frozen mountain range. Towering cliffs and treacherous ice shelves.
+  CardColor: {r: 0.7, g: 0.8, b: 0.95, a: 1}
+  Icon: {fileID: 0}
+  DifficultyTier: 4
+  HeightMin: 35
+  HeightMax: 56
+  NoiseScale: 0.03
+  NoiseOctaves: 6
+  NoisePersistence: 0.55
+  NoiseLacunarity: 2.5
+  SurfaceBlock: 4
+  SubSurfaceBlock: 3
+  MapPosition: {x: 0.5, y: 0.8}

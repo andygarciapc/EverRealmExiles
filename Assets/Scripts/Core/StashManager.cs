@@ -15,6 +15,7 @@ namespace EverRealm.Exiles.Core
     {
         [SerializeField] private ItemRegistry _itemRegistry;
         [SerializeField] private WeaponRegistry _weaponRegistry;
+        [SerializeField] private BiomeRegistry _biomeRegistry;
 
         private Inventory _stash;
         private SaveData _data;
@@ -24,6 +25,7 @@ namespace EverRealm.Exiles.Core
         public SaveData Stats => _data;
         public ItemRegistry ItemRegistry => _itemRegistry;
         public WeaponRegistry WeaponRegistry => _weaponRegistry;
+        public BiomeRegistry BiomeRegistry => _biomeRegistry;
 
         // ---------------------------------------------------------------------
 
@@ -34,6 +36,7 @@ namespace EverRealm.Exiles.Core
 
             _itemRegistry.Initialize();
             _weaponRegistry.Initialize();
+            if (_biomeRegistry != null) _biomeRegistry.Initialize();
 
             _data = SaveManager.Load();
             _stash = new Inventory(100);
@@ -107,6 +110,37 @@ namespace EverRealm.Exiles.Core
             _data.SelectedWeaponId = weaponId ?? "";
             Save();
         }
+
+        // ---------------------------------------------------------------------
+        // Biome selection
+
+        /// <summary>
+        /// Get the biome selected for the next run.
+        /// Returns null if none selected (caller should use default settings).
+        /// </summary>
+        public BiomeDefinition GetSelectedBiome()
+        {
+            if (_biomeRegistry == null || string.IsNullOrEmpty(_data.SelectedBiomeId))
+                return null;
+
+            return _biomeRegistry.GetById(_data.SelectedBiomeId);
+        }
+
+        /// <summary>
+        /// Set the biome for the next run by BiomeId. Persists immediately.
+        /// </summary>
+        public void SetSelectedBiome(string biomeId)
+        {
+            _data.SelectedBiomeId = biomeId ?? "";
+            Save();
+        }
+
+        // ---------------------------------------------------------------------
+        // Player profile
+
+        public string PlayerName => _data.PlayerName;
+        public int PlayerLevel => _data.PlayerLevel;
+        public int Currency => _data.Currency;
 
         // ---------------------------------------------------------------------
         // Persistence

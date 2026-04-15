@@ -61,8 +61,20 @@ namespace EverRealm.Exiles.World
         {
             Instance       = this;
             _cts           = new CancellationTokenSource();
-            _generator     = new WorldGenerator(_settings);
             _blockEntities = new BlockEntityManager();
+
+            // Apply biome overrides if a biome was selected from the Play tab.
+            var biome = Core.GameBootstrap.Instance?.SelectedBiome;
+            if (biome != null)
+            {
+                var biomeSettings = _settings.WithBiome(biome);
+                _generator = new WorldGenerator(biomeSettings, biome.SurfaceBlock, biome.SubSurfaceBlock);
+                Debug.Log($"[WorldManager] Using biome '{biome.BiomeName}' for world generation.");
+            }
+            else
+            {
+                _generator = new WorldGenerator(_settings);
+            }
         }
 
         private void Start()

@@ -33,5 +33,24 @@ namespace EverRealm.Exiles.Data
 
         [Tooltip("Max chunks meshed per frame to avoid spikes.")]
         public int MeshPerFrame = 3;
+
+        /// <summary>
+        /// Create a runtime copy of these settings with biome overrides applied.
+        /// The original asset is not modified.
+        /// </summary>
+        public WorldGenSettings WithBiome(BiomeDefinition biome)
+        {
+            var copy = Instantiate(this);
+            copy.name = $"{name}_{biome.BiomeId}";
+
+            copy.HeightMin        = biome.HeightMin;
+            copy.HeightMax        = biome.HeightMax;
+            copy.NoiseScale       = biome.NoiseScale;
+            copy.NoiseOctaves     = biome.NoiseOctaves;
+            copy.NoisePersistence = biome.NoisePersistence;
+            copy.NoiseLacunarity  = biome.NoiseLacunarity;
+
+            return copy;
+        }
     }
 }

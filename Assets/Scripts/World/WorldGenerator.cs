@@ -13,14 +13,20 @@ namespace EverRealm.Exiles.World
     public sealed class WorldGenerator
     {
         private readonly WorldGenSettings _s;
+        private readonly BlockType _surfaceBlock;
+        private readonly BlockType _subSurfaceBlock;
 
         // Precomputed seed offsets so each noise layer is independent.
         private readonly float _seedX;
         private readonly float _seedZ;
 
-        public WorldGenerator(WorldGenSettings settings)
+        public WorldGenerator(WorldGenSettings settings,
+            BlockType surfaceBlock = BlockType.Grass,
+            BlockType subSurfaceBlock = BlockType.Dirt)
         {
             _s = settings;
+            _surfaceBlock = surfaceBlock;
+            _subSurfaceBlock = subSurfaceBlock;
             // Scatter seed offsets so nearby seeds don't produce similar worlds.
             _seedX = settings.Seed * 0.3721f;
             _seedZ = settings.Seed * 0.6547f;
@@ -138,8 +144,8 @@ namespace EverRealm.Exiles.World
         private BlockType BlockAt(int wx, int y, int wz, int surface)
         {
             if (y > surface)          return BlockType.Air;
-            if (y == surface)         return BlockType.Grass;
-            if (y >= surface - 3)     return BlockType.Dirt;
+            if (y == surface)         return _surfaceBlock;
+            if (y >= surface - 3)     return _subSurfaceBlock;
 
             // Ore seams — 3-D approximation with two 2-D noise layers
             if (y < 48 && OreNoise(wx, y, wz, 0.09f, _s.Seed + 10) > 0.84f) return BlockType.CoalOre;

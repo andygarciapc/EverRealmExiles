@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e251553485981344887823fca0c6a95c, type: 3}
+  m_Name: Sandstone Wastes
+  m_EditorClassIdentifier: Assembly-CSharp::EverRealm.Exiles.Data.BiomeDefinition
+  BiomeId: sandstone_wastes
+  BiomeName: Sandstone Wastes
+  Description: Endless dunes and exposed sandstone mesas. Flat but exposed.
+  CardColor: {r: 0.85, g: 0.75, b: 0.45, a: 1}
+  Icon: {fileID: 0}
+  DifficultyTier: 2
+  HeightMin: 25
+  HeightMax: 40
+  NoiseScale: 0.035
+  NoiseOctaves: 3
+  NoisePersistence: 0.6
+  NoiseLacunarity: 1.8
+  SurfaceBlock: 4
+  SubSurfaceBlock: 4
+  MapPosition: {x: 0.2, y: 0.25}

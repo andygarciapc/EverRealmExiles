@@ -56,11 +56,6 @@ namespace EverRealm.Exiles.UI
             if (_soloButton != null)
             {
                 _soloButton.onClick.AddListener(OnSoloClicked);
-                Debug.Log("[HideoutUI] Solo button wired.");
-            }
-            else
-            {
-                Debug.LogError("[HideoutUI] _soloButton is null — check prefab field assignment.");
             }
 
             // Multiplayer is a future feature — button is visible but not interactable.
