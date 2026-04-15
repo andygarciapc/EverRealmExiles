@@ -62,6 +62,7 @@ namespace EverRealm.Exiles.Combat
                     case SwingState.Windup:
                         State       = SwingState.Active;
                         _stateTimer = _currentActive;
+                        Core.AudioManager.Instance?.PlaySwordSwing();
                         break;
                     case SwingState.Active:
                         State       = SwingState.Recovery;
@@ -101,13 +102,16 @@ namespace EverRealm.Exiles.Combat
                 Vector3 hitPoint = _overlapBuffer[i].ClosestPoint(center);
                 Vector3 knockDir = (_overlapBuffer[i].transform.position - transform.position).normalized;
 
-                damageable.TakeDamage(new DamageInfo(
+                var info = new DamageInfo(
                     _currentDamage,
                     hitPoint,
                     knockDir,
                     _weapon.KnockbackForce,
                     gameObject
-                ));
+                );
+                damageable.TakeDamage(info);
+                CombatFeedback.Instance?.OnPlayerDealtDamage(info);
+                Core.AudioManager.Instance?.PlayHitImpact(hitPoint);
             }
         }
     }

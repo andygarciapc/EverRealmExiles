@@ -48,6 +48,7 @@ namespace EverRealm.Exiles.Extraction
                 _player = playerGo.transform;
 
             GameBootstrap.Instance?.SetState(GameState.Extracting);
+            AudioManager.Instance?.PlayExtractionActivate(transform.position);
         }
 
         private void Update()
@@ -74,6 +75,7 @@ namespace EverRealm.Exiles.Extraction
                 {
                     _completed = true;
                     OnExtractionComplete?.Invoke();
+                    AudioManager.Instance?.PlayExtractionComplete();
                     Debug.Log("[ExtractionZone] Extraction complete!");
                     RunManager.Instance?.EndRun(true);
                 }

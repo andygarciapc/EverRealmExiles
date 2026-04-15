@@ -38,7 +38,10 @@ namespace EverRealm.Exiles.Items
             if (inv == null) return;
 
             if (inv.TryAdd(_item, _count))
+            {
+                Core.AudioManager.Instance?.PlayLootPickup();
                 Destroy(gameObject);
+            }
         }
 
         private void LateUpdate()

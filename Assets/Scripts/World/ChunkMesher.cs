@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using Unity.Collections;
+using Unity.Jobs;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -23,7 +26,117 @@ namespace EverRealm.Exiles.World
     {
         public static readonly int BlockTypeCount = Enum.GetValues(typeof(BlockType)).Length;
 
+        /// <summary>Toggle to fall back to synchronous meshing if Burst is unavailable.</summary>
+        public static bool UseJobs = true;
+
         private static readonly int[] ChunkDims = { Chunk.Width, Chunk.Height, Chunk.Depth };
+
+        // -----------------------------------------------------------------
+        // Job System path
+        // -----------------------------------------------------------------
+
+        /// <summary>Holds native buffers for an in-flight mesh job.</summary>
+        public struct MeshJobData
+        {
+            public Chunk Chunk;
+            public JobHandle Handle;
+            public NativeArray<byte> Blocks;
+            public NativeList<float3> Vertices;
+            public NativeList<int> Triangles;
+            public NativeList<float2> UVs;
+        }
+
+        /// <summary>
+        /// Flattens chunk block data into a NativeArray and schedules a
+        /// Burst-compiled <see cref="ChunkMeshJob"/>. Call <see cref="CompleteMesh"/>
+        /// after the job finishes to create the Mesh and dispose native buffers.
+        /// </summary>
+        public static MeshJobData ScheduleJob(Chunk chunk)
+        {
+            int totalBlocks = Chunk.Width * Chunk.Height * Chunk.Depth;
+            var blocks   = new NativeArray<byte>(totalBlocks, Allocator.TempJob);
+            var vertices = new NativeList<float3>(2048, Allocator.TempJob);
+            var tris     = new NativeList<int>(4096, Allocator.TempJob);
+            var uvs      = new NativeList<float2>(2048, Allocator.TempJob);
+
+            chunk.CopyBlocksFlat(blocks);
+
+            var job = new ChunkMeshJob
+            {
+                Blocks         = blocks,
+                BlockTypeCount = BlockTypeCount,
+                Vertices       = vertices,
+                Triangles      = tris,
+                UVs            = uvs
+            };
+
+            return new MeshJobData
+            {
+                Chunk    = chunk,
+                Handle   = job.Schedule(),
+                Blocks   = blocks,
+                Vertices = vertices,
+                Triangles = tris,
+                UVs      = uvs
+            };
+        }
+
+        /// <summary>
+        /// Completes a scheduled mesh job, creates a Mesh from the results,
+        /// and disposes all native buffers.
+        /// </summary>
+        public static Mesh CompleteMesh(MeshJobData data)
+        {
+            data.Handle.Complete();
+
+            int vertCount = data.Vertices.Length;
+            int triCount  = data.Triangles.Length;
+
+            var mesh = new Mesh { name = "ChunkMesh" };
+            if (vertCount > 65535) mesh.indexFormat = IndexFormat.UInt32;
+
+            // Copy NativeList → managed arrays for Mesh API.
+            var verts = new Vector3[vertCount];
+            var uvArr = new Vector2[vertCount];
+            for (int i = 0; i < vertCount; i++)
+            {
+                var v  = data.Vertices[i];
+                verts[i] = new Vector3(v.x, v.y, v.z);
+                var uv = data.UVs[i];
+                uvArr[i] = new Vector2(uv.x, uv.y);
+            }
+
+            var triArr = new int[triCount];
+            for (int i = 0; i < triCount; i++)
+                triArr[i] = data.Triangles[i];
+
+            mesh.vertices  = verts;
+            mesh.triangles = triArr;
+            mesh.uv        = uvArr;
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+
+            data.Blocks.Dispose();
+            data.Vertices.Dispose();
+            data.Triangles.Dispose();
+            data.UVs.Dispose();
+
+            return mesh;
+        }
+
+        /// <summary>Disposes native buffers without creating a mesh (cleanup on destroy).</summary>
+        public static void DisposeJobData(MeshJobData data)
+        {
+            data.Handle.Complete();
+            data.Blocks.Dispose();
+            data.Vertices.Dispose();
+            data.Triangles.Dispose();
+            data.UVs.Dispose();
+        }
+
+        // -----------------------------------------------------------------
+        // Synchronous fallback path
+        // -----------------------------------------------------------------
 
         public static Mesh BuildMesh(Chunk chunk)
         {
@@ -155,11 +268,17 @@ namespace EverRealm.Exiles.World
             verts.Add(v0 + duV + dvV);
             verts.Add(v0 + dvV);
 
-            // Simple atlas UV: each block type is one row in a Nx1 texture (height = BlockTypeCount).
-            // u = 0.5 (single column), v = (row + 0.5) / BlockTypeCount.
-            float atlasV = ((int)blockType + 0.5f) / BlockTypeCount;
-            var uv = new Vector2(0.5f, atlasV);
-            uvs.Add(uv); uvs.Add(uv); uvs.Add(uv); uvs.Add(uv);
+            // Tiling atlas UV: the atlas is N-pixels wide × BlockTypeCount rows.
+            // U spans [0, quadWidth] so the texture pattern tiles per block face.
+            // V selects the block type row center. Material wrap mode = Repeat.
+            float quadU = duV.magnitude; // width in blocks — tiles in U
+            float quadVSize = dvV.magnitude; // height in blocks — tiles in V
+            float rowCenter = ((int)blockType + 0.5f) / BlockTypeCount;
+
+            uvs.Add(new Vector2(0f,       rowCenter));
+            uvs.Add(new Vector2(quadU,    rowCenter));
+            uvs.Add(new Vector2(quadU,    rowCenter));
+            uvs.Add(new Vector2(0f,       rowCenter));
 
             // Unity: cross product of winding = front-face normal direction.
             // !isBack needs normal in +d direction; isBack needs -d.

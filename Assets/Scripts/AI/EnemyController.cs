@@ -21,7 +21,7 @@ namespace EverRealm.Exiles.AI
     [RequireComponent(typeof(EnemyHealth))]
     public sealed class EnemyController : MonoBehaviour
     {
-        public enum State { Patrol, Chase, Attack, Stagger, Dead }
+        public enum State { Patrol, Chase, Attack, Retreat, Stagger, Dead }
 
         [SerializeField] private EnemyDefinition _definition;
 
@@ -33,9 +33,9 @@ namespace EverRealm.Exiles.AI
 
         public State CurrentState { get; private set; } = State.Patrol;
 
-        private EnemyMover  _mover;
-        private EnemyAttack _attack;
-        private EnemyHealth _health;
+        private EnemyMover   _mover;
+        private IEnemyAttack _attack;
+        private EnemyHealth  _health;
         private Transform   _player;
 
         private float _patrolWaitTimer;
@@ -48,14 +48,29 @@ namespace EverRealm.Exiles.AI
 
         // -------------------------------------------------------------------------
 
+        [Header("Ranged")]
+        [SerializeField] private GameObject _projectilePrefab;
+
         private void Awake()
         {
             var cc = GetComponent<CharacterController>();
             _mover  = new EnemyMover(transform, cc);
-            _attack = GetComponent<EnemyAttack>();
             _health = GetComponent<EnemyHealth>();
 
-            _attack.Init(_definition);
+            // Resolve attack component: prefer ranged if present, fall back to melee.
+            var ranged = GetComponent<EnemyRangedAttack>();
+            if (ranged != null)
+            {
+                ranged.Init(_definition, _projectilePrefab);
+                _attack = ranged;
+            }
+            else
+            {
+                var melee = GetComponent<EnemyAttack>();
+                melee.Init(_definition);
+                _attack = melee;
+            }
+
             _health.Init(_definition, this);
 
             // Spawn world-space health bar.
@@ -69,6 +84,17 @@ namespace EverRealm.Exiles.AI
 
             _mover.SetSpeed(_definition.MoveSpeed);
             _spawnPoint = transform.position;
+
+            // Apply visual overrides from definition.
+            if (_definition.Scale != 1f)
+                transform.localScale = Vector3.one * _definition.Scale;
+
+            if (_definition.BodyColor != Color.gray)
+            {
+                var rend = GetComponentInChildren<Renderer>();
+                if (rend != null)
+                    rend.material.color = _definition.BodyColor;
+            }
         }
 
         private void Start()
@@ -88,7 +114,7 @@ namespace EverRealm.Exiles.AI
                 _playerRetryTimer -= Time.deltaTime;
                 if (_playerRetryTimer <= 0f)
                 {
-                    _playerRetryTimer = 1.5f;
+                    _playerRetryTimer = 0.5f;
                     var playerObj = GameObject.FindGameObjectWithTag("Player");
                     if (playerObj != null)
                         _player = playerObj.transform;
@@ -103,6 +129,7 @@ namespace EverRealm.Exiles.AI
                 case State.Patrol:  UpdatePatrol();  break;
                 case State.Chase:   UpdateChase();   break;
                 case State.Attack:  UpdateAttack();  break;
+                case State.Retreat: UpdateRetreat(); break;
                 case State.Stagger: UpdateStagger(); break;
             }
         }
@@ -139,6 +166,13 @@ namespace EverRealm.Exiles.AI
                 return;
             }
 
+            // Ranged enemies: retreat if player gets too close.
+            if (_definition.IsRanged && PlayerInRange(_definition.RetreatDistance))
+            {
+                TransitionTo(State.Retreat);
+                return;
+            }
+
             if (PlayerInRange(_definition.AttackRange))
             {
                 TransitionTo(State.Attack);
@@ -163,12 +197,43 @@ namespace EverRealm.Exiles.AI
 
             if (!_attack.IsBusy)
             {
+                // Ranged enemies retreat if player closes in.
+                if (_definition.IsRanged && PlayerInRange(_definition.RetreatDistance))
+                {
+                    TransitionTo(State.Retreat);
+                    return;
+                }
+
                 if (!PlayerInRange(_definition.AttackRange * 1.2f))
                 {
                     TransitionTo(State.Chase);
                     return;
                 }
                 _attack.StartAttack();
+            }
+        }
+
+        private void UpdateRetreat()
+        {
+            if (_player == null || !PlayerInRange(_definition.LoseRadius))
+            {
+                TransitionTo(State.Patrol);
+                return;
+            }
+
+            // Back away from the player while facing them.
+            _mover.FaceTarget(_player.position, 10f);
+            Vector3 awayDir = (transform.position - _player.position).normalized;
+            Vector3 retreatTarget = transform.position + awayDir * 3f;
+            _mover.MoveTo(retreatTarget);
+
+            // Transition to Attack once we're at preferred range.
+            if (!PlayerInRange(_definition.RetreatDistance * 1.5f))
+            {
+                if (PlayerInRange(_definition.AttackRange))
+                    TransitionTo(State.Attack);
+                else
+                    TransitionTo(State.Chase);
             }
         }
 
@@ -199,6 +264,7 @@ namespace EverRealm.Exiles.AI
 
             Debug.Log($"[{_definition.DisplayName}] Died!");
             RunManager.Instance?.RegisterKill();
+            Core.AudioManager.Instance?.PlayEnemyDeath(transform.position);
 
             GetComponent<CharacterController>().enabled = false;
             var col = GetComponent<Collider>();
@@ -219,7 +285,7 @@ namespace EverRealm.Exiles.AI
 
         private void TransitionTo(State next)
         {
-            if (CurrentState == State.Chase || CurrentState == State.Attack)
+            if (CurrentState == State.Chase || CurrentState == State.Attack || CurrentState == State.Retreat)
                 _mover.Stop();
 
             CurrentState = next;

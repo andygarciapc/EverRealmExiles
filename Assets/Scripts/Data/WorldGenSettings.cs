@@ -34,6 +34,16 @@ namespace EverRealm.Exiles.Data
         [Tooltip("Max chunks meshed per frame to avoid spikes.")]
         public int MeshPerFrame = 3;
 
+        [Header("Caves")]
+        [Tooltip("Noise scale for cave generation. Larger = wider tunnels.")]
+        public float CaveNoiseScale = 0.07f;
+        [Tooltip("Threshold for cave carving (0-1). Higher = fewer caves.")]
+        [Range(0.4f, 0.9f)] public float CaveThreshold = 0.62f;
+        [Tooltip("Minimum Y level for cave floors.")]
+        public int CaveMinY = 5;
+        [Tooltip("Minimum blocks below surface before caves can appear.")]
+        public int CaveMinDepth = 5;
+
         /// <summary>
         /// Create a runtime copy of these settings with biome overrides applied.
         /// The original asset is not modified.

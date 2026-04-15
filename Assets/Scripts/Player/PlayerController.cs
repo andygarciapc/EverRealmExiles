@@ -44,6 +44,7 @@ namespace EverRealm.Exiles.Player
         private bool    _snapped; // True once the player has been placed on terrain.
         private float   _snapSettleTimer; // Seconds to settle after snap before allowing player movement.
         private float   _lastTerrainY;    // Y of the terrain at snap — used for fall-through recovery.
+        private float   _footstepTimer;   // Counts down between footstep sounds.
 
         // Interaction detection
         private string _currentInteractPrompt = string.Empty;
@@ -122,6 +123,21 @@ namespace EverRealm.Exiles.Player
             );
 
             _cc.Move(displacement);
+
+            // Footstep audio — play while grounded and moving.
+            if (_cc.isGrounded && _moveInput.sqrMagnitude > 0.01f)
+            {
+                _footstepTimer -= dt;
+                if (_footstepTimer <= 0f)
+                {
+                    _footstepTimer = _sprintHeld ? 0.28f : 0.40f;
+                    Core.AudioManager.Instance?.PlayFootstep(transform.position);
+                }
+            }
+            else
+            {
+                _footstepTimer = 0f; // Reset so next step plays immediately.
+            }
 
             DetectInteractable();
         }

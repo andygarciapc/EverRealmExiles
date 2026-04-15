@@ -8,7 +8,7 @@ namespace EverRealm.Exiles.AI
     /// Drives a simple Windup → Active → Recovery attack cycle for an enemy.
     /// During the Active window, a sphere overlap checks for <see cref="IDamageable"/> targets.
     /// </summary>
-    public sealed class EnemyAttack : MonoBehaviour
+    public sealed class EnemyAttack : MonoBehaviour, IEnemyAttack
     {
         public enum AttackPhase { Idle, Windup, Active, Recovery }
 

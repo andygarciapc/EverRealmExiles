@@ -443,6 +443,7 @@ GameObject:
   m_Component:
   - component: {fileID: 301251026}
   - component: {fileID: 301251025}
+  - component: {fileID: 301251027}
   m_Layer: 10
   m_Name: WorldManager
   m_TagString: Untagged
@@ -465,6 +466,14 @@ MonoBehaviour:
   _settings: {fileID: 11400000, guid: 61cc9d75d7ceb2f4cb5ab2dca68de457, type: 2}
   _chunkMaterial: {fileID: 2100000, guid: 6a1143ee683302f4aa628c052723efc1, type: 2}
   _playerTransform: {fileID: 1481373323}
+  _poiSettings: {fileID: 11400000, guid: 6e7539122a2c22b42b950672c2bb4192, type: 2}
+  _enemyPrefab: {fileID: 714385018868985926, guid: af3224498f18c4b419827b1a91ec9aa0, type: 3}
+  _heavyBrutePrefab: {fileID: 5753692589934775893, guid: 935f30f4660c0d54aab16d76c17ac313, type: 3}
+  _rangedArcherPrefab: {fileID: 5941794895024502530, guid: 76105894e09499d48adf5bba1e8211ca, type: 3}
+  _lootPickupPrefab: {fileID: 8177180590342612331, guid: 23a5e7c14469b47469adbe5759c3e7ae, type: 3}
+  _safeLootTable: {fileID: 11400000, guid: 1fafa7f7ba56fbd44ba481080194aded, type: 2}
+  _mediumLootTable: {fileID: 11400000, guid: c5fc818c67a83504aa6a1aa8e9013ce0, type: 2}
+  _highLootTable: {fileID: 11400000, guid: 7afde19b1a2adf947887fee5bd90e945, type: 2}
 --- !u!4 &301251026
 Transform:
   m_ObjectHideFlags: 0
@@ -472,6 +481,127 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 301251024}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &301251027
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 301251024}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7085d123d5451d047bb2fb136b88e503, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EverRealm.Exiles.World.WorldBoundary
+  _settings: {fileID: 11400000, guid: 61cc9d75d7ceb2f4cb5ab2dca68de457, type: 2}
+--- !u!1001 &676812598
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 2691188427248966485, guid: 0368b952d6f4819439d5b93dacbbd081, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2691188427248966485, guid: 0368b952d6f4819439d5b93dacbbd081, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2691188427248966485, guid: 0368b952d6f4819439d5b93dacbbd081, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2691188427248966485, guid: 0368b952d6f4819439d5b93dacbbd081, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2691188427248966485, guid: 0368b952d6f4819439d5b93dacbbd081, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2691188427248966485, guid: 0368b952d6f4819439d5b93dacbbd081, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2691188427248966485, guid: 0368b952d6f4819439d5b93dacbbd081, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2691188427248966485, guid: 0368b952d6f4819439d5b93dacbbd081, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2691188427248966485, guid: 0368b952d6f4819439d5b93dacbbd081, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2691188427248966485, guid: 0368b952d6f4819439d5b93dacbbd081, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3847013270700569623, guid: 0368b952d6f4819439d5b93dacbbd081, type: 3}
+      propertyPath: m_Name
+      value: AudioManager
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 0368b952d6f4819439d5b93dacbbd081, type: 3}
+--- !u!1 &1037311497
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1037311499}
+  - component: {fileID: 1037311498}
+  m_Layer: 0
+  m_Name: CombatFeedback
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1037311498
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037311497}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eebba085694f5c245bcde519b3767ec9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EverRealm.Exiles.Combat.CombatFeedback
+  _defaultShakeIntensity: 0.15
+  _defaultShakeDuration: 0.12
+  _heavyShakeIntensity: 0.3
+  _heavyShakeDuration: 0.2
+  _hitPauseDuration: 0.05
+  _hitPauseScale: 0.1
+  _hitVFXPrefab: {fileID: 1494394967092014366, guid: f2f2800c85d21374cb9ff55f10b56a3f, type: 3}
+--- !u!4 &1037311499
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1037311497}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -844,3 +974,5 @@ SceneRoots:
   - {fileID: 301251026}
   - {fileID: 1481373323}
   - {fileID: 2000000002}
+  - {fileID: 1037311499}
+  - {fileID: 676812598}

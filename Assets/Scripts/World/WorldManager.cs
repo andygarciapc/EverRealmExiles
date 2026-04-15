@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Unity.Jobs;
 using UnityEngine;
 using EverRealm.Exiles.Data;
 using EverRealm.Exiles.Extraction;
@@ -33,9 +34,24 @@ namespace EverRealm.Exiles.World
         [SerializeField] private Material         _chunkMaterial;
         [SerializeField] private Transform        _playerTransform;
 
+        [Header("POI Settings")]
+        [SerializeField] private POISettings      _poiSettings;
+
+        [Header("POI Prefabs")]
+        [SerializeField] private GameObject        _enemyPrefab;
+        [SerializeField] private GameObject        _heavyBrutePrefab;
+        [SerializeField] private GameObject        _rangedArcherPrefab;
+        [SerializeField] private GameObject        _lootPickupPrefab;
+
+        [Header("Zone Loot Tables")]
+        [SerializeField] private LootTable         _safeLootTable;
+        [SerializeField] private LootTable         _mediumLootTable;
+        [SerializeField] private LootTable         _highLootTable;
+
         private WorldGenerator  _generator;
         private BlockEntityManager _blockEntities;
         private CancellationTokenSource _cts;
+        private int _biomeDifficultyTier = 1;
 
         /// <summary>Singleton accessor so systems like AI pathfinding can query blocks.</summary>
         public static WorldManager Instance { get; private set; }
@@ -55,6 +71,9 @@ namespace EverRealm.Exiles.World
         // Background-thread → main-thread handoff
         private readonly ConcurrentQueue<Chunk> _meshQueue = new();
 
+        // In-flight Burst mesh jobs (Job System path)
+        private readonly List<ChunkMesher.MeshJobData> _pendingJobs = new();
+
         // -------------------------------------------------------------------------
 
         private void Awake()
@@ -67,21 +86,28 @@ namespace EverRealm.Exiles.World
             var biome = Core.GameBootstrap.Instance?.SelectedBiome;
             if (biome != null)
             {
+                _biomeDifficultyTier = biome.DifficultyTier;
                 var biomeSettings = _settings.WithBiome(biome);
-                _generator = new WorldGenerator(biomeSettings, biome.SurfaceBlock, biome.SubSurfaceBlock);
-                Debug.Log($"[WorldManager] Using biome '{biome.BiomeName}' for world generation.");
+                _generator = new WorldGenerator(
+                    biomeSettings, biome.SurfaceBlock, biome.SubSurfaceBlock,
+                    _poiSettings, _settings.ChunkRadius, biome.HasTrees);
+                Debug.Log($"[WorldManager] Using biome '{biome.BiomeName}' (difficulty {biome.DifficultyTier}) for world generation.");
             }
             else
             {
-                _generator = new WorldGenerator(_settings);
+                _generator = new WorldGenerator(
+                    _settings, chunkRadius: _settings.ChunkRadius, poiSettings: _poiSettings);
             }
         }
 
         private void Start()
         {
-            // Populate the chunk material with a generated debug atlas if no texture is assigned.
+            // Populate the chunk material with a generated atlas if no texture is assigned.
             if (_chunkMaterial != null && _chunkMaterial.mainTexture == null)
+            {
                 _chunkMaterial.mainTexture = GenerateDebugAtlas();
+                _chunkMaterial.mainTextureScale = Vector2.one;
+            }
         }
 
         private void Update()
@@ -92,8 +118,16 @@ namespace EverRealm.Exiles.World
 
         private void OnDestroy()
         {
+            if (Instance == this)
+                Instance = null;
+
             _cts.Cancel();
             _cts.Dispose();
+
+            // Dispose any in-flight mesh jobs to prevent native memory leaks.
+            for (int i = 0; i < _pendingJobs.Count; i++)
+                ChunkMesher.DisposeJobData(_pendingJobs[i]);
+            _pendingJobs.Clear();
         }
 
         // -------------------------------------------------------------------------
@@ -157,18 +191,45 @@ namespace EverRealm.Exiles.World
 
         private void ProcessMeshQueue()
         {
-            int count = 0;
-            while (count < _settings.MeshPerFrame && _meshQueue.TryDequeue(out var chunk))
+            // 1. Complete any finished Burst mesh jobs.
+            for (int i = _pendingJobs.Count - 1; i >= 0; i--)
+            {
+                var jobData = _pendingJobs[i];
+                if (!jobData.Handle.IsCompleted) continue;
+
+                _pendingJobs.RemoveAt(i);
+
+                Mesh mesh        = ChunkMesher.CompleteMesh(jobData);
+                Chunk chunk      = jobData.Chunk;
+                ChunkRenderer cr = SpawnChunkRenderer(chunk, mesh);
+                _activeChunks[chunk.ChunkPosition] = cr;
+                _chunkData[chunk.ChunkPosition]    = chunk;
+
+                RegisterBlockEntities(chunk);
+                ProcessPOIMarkers(chunk);
+            }
+
+            // 2. Schedule new jobs (or build synchronously as fallback).
+            int scheduled = 0;
+            while (scheduled < _settings.MeshPerFrame && _meshQueue.TryDequeue(out var chunk))
             {
                 _pendingChunks.Remove(chunk.ChunkPosition);
 
-                Mesh mesh        = ChunkMesher.BuildMesh(chunk);
-                ChunkRenderer cr = SpawnChunkRenderer(chunk, mesh);
-                _activeChunks[chunk.ChunkPosition] = cr;
-                _chunkData[chunk.ChunkPosition] = chunk;
+                if (ChunkMesher.UseJobs)
+                {
+                    _pendingJobs.Add(ChunkMesher.ScheduleJob(chunk));
+                }
+                else
+                {
+                    Mesh mesh        = ChunkMesher.BuildMesh(chunk);
+                    ChunkRenderer cr = SpawnChunkRenderer(chunk, mesh);
+                    _activeChunks[chunk.ChunkPosition] = cr;
+                    _chunkData[chunk.ChunkPosition]    = chunk;
 
-                RegisterBlockEntities(chunk);
-                count++;
+                    RegisterBlockEntities(chunk);
+                    ProcessPOIMarkers(chunk);
+                }
+                scheduled++;
             }
         }
 
@@ -213,9 +274,146 @@ namespace EverRealm.Exiles.World
                             case BlockType.ExtractionCore:
                                 _blockEntities.Register(new ExtractionBlockEntity(worldPos));
                                 break;
-                            // Future: case BlockType.Chest → register ChestBlockEntity
+
+                            case BlockType.TreasureCacheCore:
+                                var zone = MapLayout.GetZone(worldPos.x, worldPos.z, _settings.ChunkRadius);
+                                _blockEntities.Register(new ChestBlockEntity(
+                                    worldPos,
+                                    GetLootTableForZone(zone),
+                                    GetRollCountForZone(zone),
+                                    _lootPickupPrefab));
+                                break;
+
+                            case BlockType.EnemyCampCore:
+                                // Visual marker only — enemies spawned via POI markers below.
+                                break;
                         }
                     }
+        }
+
+        /// <summary>
+        /// Processes POI markers from a newly loaded chunk to spawn runtime
+        /// GameObjects (enemies, etc.) on the main thread.
+        /// </summary>
+        private void ProcessPOIMarkers(Chunk chunk)
+        {
+            var markers = chunk.GetPOIMarkers();
+            for (int i = 0; i < markers.Count; i++)
+            {
+                var poi = markers[i];
+                switch (poi.Type)
+                {
+                    case POIType.EnemyCamp:
+                        SpawnEnemyCamp(poi);
+                        break;
+
+                    case POIType.TreasureCache:
+                        // Handled by block entity registration above.
+                        break;
+
+                    case POIType.DungeonEntrance:
+                        Debug.Log($"[WorldManager] Dungeon entrance stub at ({poi.WorldX}, {poi.WorldZ})");
+                        break;
+                }
+            }
+        }
+
+        // -------------------------------------------------------------------------
+        // POI spawning
+
+        private void SpawnEnemyCamp(POIMarker poi)
+        {
+            if (_enemyPrefab == null) return;
+
+            int baseCount = _poiSettings != null
+                ? poi.Zone switch
+                {
+                    RiskZone.Medium => _poiSettings.MediumZoneEnemies,
+                    RiskZone.High   => _poiSettings.HighZoneEnemies,
+                    _               => _poiSettings.SafeZoneEnemies
+                }
+                : poi.Zone switch
+                {
+                    RiskZone.Medium => 2,
+                    RiskZone.High   => 4,
+                    _               => 1
+                };
+
+            // Scale by biome difficulty: tier 1 = 1x, tier 5 = 3x.
+            float difficultyScale = 1f + (_biomeDifficultyTier - 1) * 0.5f;
+            int enemyCount = Mathf.Max(1, Mathf.RoundToInt(baseCount * difficultyScale));
+
+            for (int i = 0; i < enemyCount; i++)
+            {
+                // Distribute enemies in a ring around the camp center.
+                float angle = (i / (float)enemyCount) * Mathf.PI * 2f;
+                float dist = 3f + i * 1.5f;
+                float spawnX = poi.WorldX + 0.5f + Mathf.Cos(angle) * dist;
+                float spawnZ = poi.WorldZ + 0.5f + Mathf.Sin(angle) * dist;
+
+                int sx = Mathf.FloorToInt(spawnX);
+                int sz = Mathf.FloorToInt(spawnZ);
+                int spawnY = GetSurfaceY(sx, sz);
+                if (spawnY < 0) continue;
+
+                var pos = new Vector3(spawnX, spawnY + 0.5f, spawnZ);
+                var prefab = PickEnemyPrefab(poi.Zone, i, poi.WorldX, poi.WorldZ);
+                if (prefab != null)
+                    Instantiate(prefab, pos, Quaternion.Euler(0f, angle * Mathf.Rad2Deg, 0f));
+            }
+        }
+
+        /// <summary>
+        /// Picks an enemy prefab based on zone and a deterministic hash.
+        /// Medium zones mix in archers and occasional brutes.
+        /// High zones have roughly equal variety.
+        /// </summary>
+        private GameObject PickEnemyPrefab(RiskZone zone, int enemyIndex, int campX, int campZ)
+        {
+            // Deterministic variety per enemy per camp.
+            int hash = campX * 374761393 + campZ * 668265263 + enemyIndex * 1274126177;
+            float roll = ((hash & 0x7FFFFFFF) / (float)0x7FFFFFFF);
+
+            switch (zone)
+            {
+                case RiskZone.Medium:
+                    // 60% Grunt, 25% Archer, 15% Brute
+                    if (roll < 0.60f) return _enemyPrefab;
+                    if (roll < 0.85f) return _rangedArcherPrefab != null ? _rangedArcherPrefab : _enemyPrefab;
+                    return _heavyBrutePrefab != null ? _heavyBrutePrefab : _enemyPrefab;
+
+                case RiskZone.High:
+                    // 35% Grunt, 35% Archer, 30% Brute
+                    if (roll < 0.35f) return _enemyPrefab;
+                    if (roll < 0.70f) return _rangedArcherPrefab != null ? _rangedArcherPrefab : _enemyPrefab;
+                    return _heavyBrutePrefab != null ? _heavyBrutePrefab : _enemyPrefab;
+
+                default:
+                    return _enemyPrefab;
+            }
+        }
+
+        private LootTable GetLootTableForZone(RiskZone zone)
+        {
+            return zone switch
+            {
+                RiskZone.High   => _highLootTable,
+                RiskZone.Medium => _mediumLootTable,
+                _               => _safeLootTable
+            };
+        }
+
+        private int GetRollCountForZone(RiskZone zone)
+        {
+            if (_poiSettings == null)
+                return zone switch { RiskZone.High => 5, RiskZone.Medium => 3, _ => 2 };
+
+            return zone switch
+            {
+                RiskZone.High   => _poiSettings.HighZoneLootRolls,
+                RiskZone.Medium => _poiSettings.MediumZoneLootRolls,
+                _               => _poiSettings.SafeZoneLootRolls
+            };
         }
 
         // -------------------------------------------------------------------------
@@ -291,36 +489,58 @@ namespace EverRealm.Exiles.World
             => Mathf.Max(Mathf.Abs(a.x - b.x), Mathf.Abs(a.y - b.y));
 
         /// <summary>
-        /// Creates a 1×N texture with one distinct colour per BlockType.
-        /// Lets you see terrain without any external texture assets.
-        /// Replace with a proper atlas in Phase 11.
+        /// Creates a 16×N texture with one colour per BlockType plus subtle
+        /// per-pixel noise for visual depth. Material wrap mode is set to
+        /// Repeat so the pattern tiles across greedy-merged faces.
         /// </summary>
         public static Texture2D GenerateDebugAtlas()
         {
             int count  = ChunkMesher.BlockTypeCount;
-            var colors = new Color[]
+            const int tileWidth = 16; // pixels per row — gives tiling detail
+
+            var baseColors = new Color[]
             {
-                Color.clear,                                // Air
-                new Color(0.30f, 0.65f, 0.20f),            // Grass
-                new Color(0.55f, 0.37f, 0.18f),            // Dirt
-                new Color(0.50f, 0.50f, 0.50f),            // Stone
-                new Color(0.90f, 0.85f, 0.55f),            // Sand
-                new Color(0.20f, 0.20f, 0.20f),            // CoalOre
-                new Color(0.70f, 0.55f, 0.45f),            // IronOre
-                new Color(0.95f, 0.80f, 0.20f),            // GoldOre
-                new Color(0.55f, 0.35f, 0.10f),            // Chest
-                new Color(0.10f, 0.85f, 0.95f),            // ExtractionCore
+                Color.clear,                                // 0  Air
+                new Color(0.30f, 0.65f, 0.20f),            // 1  Grass
+                new Color(0.55f, 0.37f, 0.18f),            // 2  Dirt
+                new Color(0.50f, 0.50f, 0.50f),            // 3  Stone
+                new Color(0.90f, 0.85f, 0.55f),            // 4  Sand
+                new Color(0.20f, 0.20f, 0.20f),            // 5  CoalOre
+                new Color(0.70f, 0.55f, 0.45f),            // 6  IronOre
+                new Color(0.95f, 0.80f, 0.20f),            // 7  GoldOre
+                new Color(0.55f, 0.35f, 0.10f),            // 8  Chest
+                new Color(0.10f, 0.85f, 0.95f),            // 9  ExtractionCore
+                new Color(0.70f, 0.15f, 0.15f),            // 10 EnemyCampCore
+                new Color(0.85f, 0.70f, 0.10f),            // 11 TreasureCacheCore
+                new Color(0.45f, 0.28f, 0.13f),            // 12 Wood
+                new Color(0.18f, 0.50f, 0.12f),            // 13 Leaves
+                new Color(0.92f, 0.95f, 0.98f),            // 14 Snow
             };
 
-            var tex = new Texture2D(1, count, TextureFormat.RGBA32, false)
+            var tex = new Texture2D(tileWidth, count, TextureFormat.RGBA32, false)
             {
                 filterMode = FilterMode.Point,
-                wrapMode   = TextureWrapMode.Clamp,
-                name       = "BlockAtlas_Debug"
+                wrapMode   = TextureWrapMode.Repeat,
+                name       = "BlockAtlas"
             };
 
-            for (int i = 0; i < count; i++)
-                tex.SetPixel(0, i, i < colors.Length ? colors[i] : Color.magenta);
+            for (int row = 0; row < count; row++)
+            {
+                Color baseCol = row < baseColors.Length ? baseColors[row] : Color.magenta;
+                for (int x = 0; x < tileWidth; x++)
+                {
+                    // Subtle per-pixel noise dithering for visual depth.
+                    float noise = Mathf.PerlinNoise(x * 0.8f + row * 13.7f, row * 7.3f + x * 0.5f);
+                    float variation = (noise - 0.5f) * 0.08f; // ±4% brightness
+                    Color c = new Color(
+                        Mathf.Clamp01(baseCol.r + variation),
+                        Mathf.Clamp01(baseCol.g + variation),
+                        Mathf.Clamp01(baseCol.b + variation),
+                        baseCol.a
+                    );
+                    tex.SetPixel(x, row, c);
+                }
+            }
 
             tex.Apply();
             return tex;

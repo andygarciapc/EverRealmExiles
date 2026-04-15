@@ -93,6 +93,8 @@ namespace EverRealm.Exiles.Player
             _health -= info.Amount;
             Debug.Log($"[Player] Took {info.Amount} damage, health: {_health}/{_maxHealth}");
             OnHealthChanged?.Invoke(_health, _maxHealth);
+            Combat.CombatFeedback.Instance?.OnPlayerTookDamage(info);
+            Core.AudioManager.Instance?.PlayPlayerHurt();
 
             if (_health <= 0f)
             {

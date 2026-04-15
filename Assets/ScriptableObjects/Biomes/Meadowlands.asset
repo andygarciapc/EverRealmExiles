@@ -26,4 +26,5 @@ MonoBehaviour:
   NoiseLacunarity: 2
   SurfaceBlock: 1
   SubSurfaceBlock: 2
+  HasTrees: 1
   MapPosition: {x: 0.35, y: 0.55}

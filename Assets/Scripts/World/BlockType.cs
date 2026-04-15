@@ -14,7 +14,12 @@ namespace EverRealm.Exiles.World
         CoalOre  = 5,
         IronOre  = 6,
         GoldOre  = 7,
-        Chest         = 8,
-        ExtractionCore = 9,
+        Chest              = 8,
+        ExtractionCore     = 9,
+        EnemyCampCore      = 10,
+        TreasureCacheCore  = 11,
+        Wood               = 12,
+        Leaves             = 13,
+        Snow               = 14,
     }
 }

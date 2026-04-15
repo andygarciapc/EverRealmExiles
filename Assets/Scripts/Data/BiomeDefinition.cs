@@ -42,6 +42,10 @@ namespace EverRealm.Exiles.Data
         public BlockType SurfaceBlock    = BlockType.Grass;
         public BlockType SubSurfaceBlock = BlockType.Dirt;
 
+        [Header("Vegetation")]
+        [Tooltip("Generate voxel trees on the surface.")]
+        public bool HasTrees = false;
+
         [Header("Map")]
         [Tooltip("Position on the world map as normalized coordinates (0-1).")]
         public Vector2 MapPosition = new(0.5f, 0.5f);

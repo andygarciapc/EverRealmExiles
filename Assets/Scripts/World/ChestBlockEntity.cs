@@ -31,6 +31,8 @@ namespace EverRealm.Exiles.World
         {
             if (_opened) return;
             _opened = true;
+            Core.AudioManager.Instance?.PlayChestOpen(
+                new UnityEngine.Vector3(Position.x + 0.5f, Position.y + 0.5f, Position.z + 0.5f));
 
             var inv = player.GetComponent<PlayerInventory>();
 

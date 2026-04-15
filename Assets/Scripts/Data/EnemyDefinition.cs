@@ -38,6 +38,22 @@ namespace EverRealm.Exiles.Data
         public float StaggerThreshold = 25f;
         public float StaggerDuration  = 0.6f;
 
+        [Header("Ranged (optional)")]
+        [Tooltip("If true, this enemy uses ranged attacks and will retreat when too close.")]
+        public bool IsRanged = false;
+        [Tooltip("Preferred combat distance for ranged enemies.")]
+        public float PreferredRange = 10f;
+        [Tooltip("Distance at which ranged enemies start retreating.")]
+        public float RetreatDistance = 5f;
+        [Tooltip("Projectile travel speed.")]
+        public float ProjectileSpeed = 15f;
+
+        [Header("Visual")]
+        [Tooltip("Scale multiplier for the enemy's transform.")]
+        public float Scale = 1f;
+        [Tooltip("Body color applied to the main renderer material.")]
+        public Color BodyColor = Color.gray;
+
         [Header("Loot")]
         [Tooltip("Loot table rolled on death. Leave null for no drops.")]
         public LootTable LootTable;

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using EverRealm.Exiles.Combat;
 
 namespace EverRealm.Exiles.Player
 {
@@ -36,11 +37,14 @@ namespace EverRealm.Exiles.Player
         private float _pitch;
 
         private Vector2 _lookDelta;
+        private Vector3 _baseLocalPosition;
 
         // -------------------------------------------------------------------------
 
         private void Awake()
         {
+            _baseLocalPosition = transform.localPosition;
+
             // Give PlayerController a reference to this pivot so it can read yaw.
             if (_playerController != null)
                 _playerController.CameraPivot = transform;
@@ -68,6 +72,10 @@ namespace EverRealm.Exiles.Player
 
             // Pitch only affects the camera pivot, not the whole body.
             transform.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
+
+            // Apply screen shake offset from combat feedback.
+            Vector3 shake = CombatFeedback.Instance != null ? CombatFeedback.Instance.ShakeOffset : Vector3.zero;
+            transform.localPosition = _baseLocalPosition + shake;
 
             _lookDelta = Vector2.zero;
         }
