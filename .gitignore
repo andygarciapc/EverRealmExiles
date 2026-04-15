@@ -99,6 +99,6 @@ InitTestScene*.unity*
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
 
 # Project-specific
-PLAN.md
-CLAUDE.md
-prompt.txt
+/PLAN.md
+/claude.md
+/Documentation/prompt.txt
