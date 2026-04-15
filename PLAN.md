@@ -94,7 +94,7 @@ Build the core voxel world: chunk-based terrain with greedy meshing, procedural 
 ---
 
 ## Phase 3 — Player Controller & Camera
-**Status: TODO**
+**Status: DONE**
 
 Responsive first-person or third-person controller with ground movement, jumping, sprinting, and a smooth camera.
 
@@ -118,7 +118,7 @@ Responsive first-person or third-person controller with ground movement, jumping
 - Add player capsule placeholder mesh + basic material
 - Wire Input System actions to controller
 
-### Key Files
+### Key Files Created
 - `Assets/Scripts/Player/PlayerController.cs`
 - `Assets/Scripts/Player/PlayerCamera.cs`
 - `Assets/Scripts/Player/PlayerMover.cs`
@@ -133,7 +133,7 @@ Responsive first-person or third-person controller with ground movement, jumping
 ---
 
 ## Phase 4 — Basic Combat System
-**Status: TODO**
+**Status: DONE**
 
 Melee combat with one weapon type: light attack, heavy attack, and dodge roll. Hit detection, damage, and basic feedback.
 
@@ -157,11 +157,11 @@ Melee combat with one weapon type: light attack, heavy attack, and dodge roll. H
 - Create one sword weapon definition asset
 - Basic hit VFX (particle system) and placeholder sound
 
-### Key Files
+### Key Files Created
 - `Assets/Scripts/Combat/IDamageable.cs`
 - `Assets/Scripts/Combat/DamageInfo.cs`
 - `Assets/Scripts/Combat/WeaponController.cs`
-- `Assets/Scripts/Combat/HitboxVolume.cs`
+- `Assets/Scripts/Combat/DamageTestTarget.cs`
 - `Assets/Scripts/Player/PlayerCombat.cs`
 - `Assets/Scripts/Data/WeaponDefinition.cs`
 
@@ -175,7 +175,7 @@ Melee combat with one weapon type: light attack, heavy attack, and dodge roll. H
 ---
 
 ## Phase 5 — Basic Enemy AI
-**Status: TODO**
+**Status: DONE**
 
 One enemy type: a melee grunt that patrols, detects the player, chases, and attacks.
 
@@ -204,11 +204,12 @@ One enemy type: a melee grunt that patrols, detects the player, chases, and atta
 - Placeholder enemy mesh (capsule + material color)
 - One enemy definition asset (Grunt)
 
-### Key Files
+### Key Files Created
 - `Assets/Scripts/AI/EnemyController.cs`
 - `Assets/Scripts/AI/EnemyMover.cs`
 - `Assets/Scripts/AI/EnemyAttack.cs`
 - `Assets/Scripts/AI/EnemyHealth.cs`
+- `Assets/Scripts/AI/VoxelPathfinder.cs`
 - `Assets/Scripts/Data/EnemyDefinition.cs`
 
 ### Verification
@@ -221,7 +222,7 @@ One enemy type: a melee grunt that patrols, detects the player, chases, and atta
 ---
 
 ## Phase 6 — Loot & Inventory System
-**Status: TODO**
+**Status: DONE**
 
 Items, loot pickups, and a lightweight inventory that persists through the run.
 
@@ -265,7 +266,7 @@ Items, loot pickups, and a lightweight inventory that persists through the run.
 ---
 
 ## Phase 7 — Extraction System & Run Flow
-**Status: TODO**
+**Status: DONE**
 
 Extraction points, run timer, run-end summary, and the loop between runs.
 

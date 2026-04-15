@@ -161,16 +161,17 @@ namespace EverRealm.Exiles.World
             var uv = new Vector2(0.5f, atlasV);
             uvs.Add(uv); uvs.Add(uv); uvs.Add(uv); uvs.Add(uv);
 
-            // Winding: front faces use CCW (Unity default), back faces are reversed.
+            // Unity: cross product of winding = front-face normal direction.
+            // !isBack needs normal in +d direction; isBack needs -d.
             if (!isBack)
             {
-                tris.Add(vi); tris.Add(vi + 3); tris.Add(vi + 2);
-                tris.Add(vi); tris.Add(vi + 2); tris.Add(vi + 1);
+                tris.Add(vi);     tris.Add(vi + 1); tris.Add(vi + 2);
+                tris.Add(vi);     tris.Add(vi + 2); tris.Add(vi + 3);
             }
             else
             {
-                tris.Add(vi); tris.Add(vi + 1); tris.Add(vi + 2);
-                tris.Add(vi); tris.Add(vi + 2); tris.Add(vi + 3);
+                tris.Add(vi);     tris.Add(vi + 2); tris.Add(vi + 1);
+                tris.Add(vi);     tris.Add(vi + 3); tris.Add(vi + 2);
             }
         }
     }

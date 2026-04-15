@@ -14,5 +14,7 @@ namespace EverRealm.Exiles.World
         CoalOre  = 5,
         IronOre  = 6,
         GoldOre  = 7,
+        Chest         = 8,
+        ExtractionCore = 9,
     }
 }

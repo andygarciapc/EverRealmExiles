@@ -7,6 +7,7 @@ namespace EverRealm.Exiles.Core
     {
         MainMenu,
         InRun,
+        Extracting,
         RunEnd
     }
 }

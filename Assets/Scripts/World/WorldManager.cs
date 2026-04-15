@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using EverRealm.Exiles.Data;
+using EverRealm.Exiles.Extraction;
 
 namespace EverRealm.Exiles.World
 {
@@ -33,10 +34,20 @@ namespace EverRealm.Exiles.World
         [SerializeField] private Transform        _playerTransform;
 
         private WorldGenerator  _generator;
+        private BlockEntityManager _blockEntities;
         private CancellationTokenSource _cts;
+
+        /// <summary>Singleton accessor so systems like AI pathfinding can query blocks.</summary>
+        public static WorldManager Instance { get; private set; }
+
+        /// <summary>Registry for special blocks (chests, etc.) that carry extra data.</summary>
+        public BlockEntityManager BlockEntities => _blockEntities;
 
         // Chunk positions currently loaded (active in scene)
         private readonly Dictionary<Vector2Int, ChunkRenderer> _activeChunks = new();
+
+        // Keep chunk data alive for runtime queries (pathfinding, destruction, etc.)
+        private readonly Dictionary<Vector2Int, Chunk> _chunkData = new();
 
         // Chunk positions with a generation task in flight
         private readonly HashSet<Vector2Int> _pendingChunks = new();
@@ -48,8 +59,10 @@ namespace EverRealm.Exiles.World
 
         private void Awake()
         {
-            _cts       = new CancellationTokenSource();
-            _generator = new WorldGenerator(_settings);
+            Instance       = this;
+            _cts           = new CancellationTokenSource();
+            _generator     = new WorldGenerator(_settings);
+            _blockEntities = new BlockEntityManager();
         }
 
         private void Start()
@@ -121,8 +134,10 @@ namespace EverRealm.Exiles.World
         private void UnloadChunk(Vector2Int chunkPos)
         {
             if (!_activeChunks.TryGetValue(chunkPos, out var cr)) return;
+            _blockEntities.RemoveChunkEntities(chunkPos);
             Destroy(cr.gameObject);
             _activeChunks.Remove(chunkPos);
+            _chunkData.Remove(chunkPos);
         }
 
         // -------------------------------------------------------------------------
@@ -138,7 +153,9 @@ namespace EverRealm.Exiles.World
                 Mesh mesh        = ChunkMesher.BuildMesh(chunk);
                 ChunkRenderer cr = SpawnChunkRenderer(chunk, mesh);
                 _activeChunks[chunk.ChunkPosition] = cr;
+                _chunkData[chunk.ChunkPosition] = chunk;
 
+                RegisterBlockEntities(chunk);
                 count++;
             }
         }
@@ -159,7 +176,99 @@ namespace EverRealm.Exiles.World
         }
 
         // -------------------------------------------------------------------------
+        // Block entity registration
+
+        /// <summary>
+        /// Scans a newly loaded chunk for special block types and registers
+        /// their block entities. Called on the main thread after meshing.
+        /// </summary>
+        private void RegisterBlockEntities(Chunk chunk)
+        {
+            int cx = chunk.ChunkPosition.x * Chunk.Width;
+            int cz = chunk.ChunkPosition.y * Chunk.Depth;
+
+            for (int x = 0; x < Chunk.Width; x++)
+                for (int z = 0; z < Chunk.Depth; z++)
+                    for (int y = 0; y < Chunk.Height; y++)
+                    {
+                        var bt = chunk.GetBlock(x, y, z);
+                        if (bt == BlockType.Air) continue;
+
+                        var worldPos = new Vector3Int(cx + x, y, cz + z);
+
+                        switch (bt)
+                        {
+                            case BlockType.ExtractionCore:
+                                _blockEntities.Register(new ExtractionBlockEntity(worldPos));
+                                break;
+                            // Future: case BlockType.Chest → register ChestBlockEntity
+                        }
+                    }
+        }
+
+        // -------------------------------------------------------------------------
         // Helpers
+
+        /// <summary>
+        /// Returns the block type at a world-space integer position.
+        /// Returns Air if the chunk is not loaded.
+        /// </summary>
+        public BlockType GetBlock(int wx, int wy, int wz)
+        {
+            // Integer division that floors for negatives.
+            int cx = wx >= 0 ? wx / Chunk.Width  : (wx - Chunk.Width  + 1) / Chunk.Width;
+            int cz = wz >= 0 ? wz / Chunk.Depth  : (wz - Chunk.Depth  + 1) / Chunk.Depth;
+            var cp = new Vector2Int(cx, cz);
+
+            if (!_chunkData.TryGetValue(cp, out Chunk chunk)) return BlockType.Air;
+
+            int lx = wx - cx * Chunk.Width;
+            int lz = wz - cz * Chunk.Depth;
+
+            if (!chunk.IsInBounds(lx, wy, lz)) return BlockType.Air;
+            return chunk.GetBlock(lx, wy, lz);
+        }
+
+        /// <summary>
+        /// Returns true if (wx, wy, wz) is a walkable surface:
+        /// the block is Air and the block below is solid.
+        /// </summary>
+        public bool IsWalkable(int wx, int wy, int wz)
+        {
+            return wy > 0
+                && GetBlock(wx, wy, wz) == BlockType.Air
+                && GetBlock(wx, wy - 1, wz) != BlockType.Air;
+        }
+
+        /// <summary>
+        /// Finds the Y of the walkable surface at (wx, wz), searching downward from startY.
+        /// Returns -1 if none found.
+        /// </summary>
+        public int GetSurfaceY(int wx, int wz, int startY = Chunk.Height - 1)
+        {
+            for (int y = startY; y > 0; y--)
+            {
+                if (IsWalkable(wx, y, wz))
+                    return y;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Convert a raycast hit on terrain to the world-space integer position
+        /// of the solid block that was hit. Nudges inward along the hit normal
+        /// so we land inside the block, not on its surface.
+        /// </summary>
+        public static Vector3Int HitToBlockPos(RaycastHit hit)
+        {
+            // Nudge slightly into the block (opposite of normal) to avoid landing on the boundary.
+            Vector3 inside = hit.point - hit.normal * 0.1f;
+            return new Vector3Int(
+                Mathf.FloorToInt(inside.x),
+                Mathf.FloorToInt(inside.y),
+                Mathf.FloorToInt(inside.z)
+            );
+        }
 
         private static Vector2Int WorldToChunk(Vector3 worldPos) => new(
             Mathf.FloorToInt(worldPos.x / Chunk.Width),
@@ -187,6 +296,8 @@ namespace EverRealm.Exiles.World
                 new Color(0.20f, 0.20f, 0.20f),            // CoalOre
                 new Color(0.70f, 0.55f, 0.45f),            // IronOre
                 new Color(0.95f, 0.80f, 0.20f),            // GoldOre
+                new Color(0.55f, 0.35f, 0.10f),            // Chest
+                new Color(0.10f, 0.85f, 0.95f),            // ExtractionCore
             };
 
             var tex = new Texture2D(1, count, TextureFormat.RGBA32, false)
