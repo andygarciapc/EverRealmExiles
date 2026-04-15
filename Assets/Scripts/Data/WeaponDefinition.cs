@@ -10,6 +10,8 @@ namespace EverRealm.Exiles.Data
     public sealed class WeaponDefinition : ScriptableObject
     {
         [Header("Identity")]
+        [Tooltip("Machine-readable key (e.g. 'sword_iron'). Stable across renames.")]
+        public string WeaponId;
         public string WeaponName = "Sword";
 
         [Header("Light Attack")]

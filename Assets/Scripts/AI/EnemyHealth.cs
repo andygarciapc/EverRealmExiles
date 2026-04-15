@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using EverRealm.Exiles.Combat;
 using EverRealm.Exiles.Data;
@@ -20,6 +21,9 @@ namespace EverRealm.Exiles.AI
         public float MaxHealth => _def != null ? _def.MaxHealth : 0f;
         public bool  IsDead    => _health <= 0f;
 
+        /// <summary>Fires when health changes. Args: (current, max).</summary>
+        public event Action<float, float> OnHealthChanged;
+
         public void Init(EnemyDefinition def, EnemyController controller)
         {
             _def        = def;
@@ -37,6 +41,7 @@ namespace EverRealm.Exiles.AI
 
             _health -= info.Amount;
             Debug.Log($"[{_def.DisplayName}] Took {info.Amount} damage, health: {_health}/{_def.MaxHealth}");
+            OnHealthChanged?.Invoke(_health, _def.MaxHealth);
 
             // Flash red.
             if (_renderer != null)

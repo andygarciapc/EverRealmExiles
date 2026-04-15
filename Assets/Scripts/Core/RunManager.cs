@@ -3,22 +3,29 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using EverRealm.Exiles.Extraction;
 using EverRealm.Exiles.Items;
+using EverRealm.Exiles.Player;
 using EverRealm.Exiles.UI;
 
 namespace EverRealm.Exiles.Core
 {
     /// <summary>
     /// Manages the lifecycle of a single extraction run:
-    /// start → track kills/time → end (success or death) → show summary → restart.
+    /// start → track kills/time → end (success or death) → show summary.
+    /// After the summary, the player returns to the MainMenu scene (hub).
     /// </summary>
     public class RunManager : MonoBehaviour
     {
         public static RunManager Instance { get; private set; }
 
         [SerializeField] private GameObject _runSummaryPrefab;
+        [SerializeField] private GameObject _gameHudPrefab;
 
         private float _runStartTime;
         private int _killCount;
+        private GameObject _gameHudInstance;
+
+        public int   KillCount   => _killCount;
+        public float ElapsedTime => Time.time - _runStartTime;
 
         private void Awake()
         {
@@ -40,6 +47,27 @@ namespace EverRealm.Exiles.Core
             _runStartTime = Time.time;
             _killCount = 0;
             GameBootstrap.Instance?.SetState(GameState.InRun);
+
+            if (_gameHudPrefab != null && _gameHudInstance == null)
+                _gameHudInstance = Instantiate(_gameHudPrefab);
+
+            // Inject loadout weapon from persistent save.
+            var stash = GameBootstrap.Instance?.Stash;
+            if (stash != null)
+            {
+                var weapon = stash.GetSelectedWeapon();
+                if (weapon != null)
+                {
+                    var player = GameObject.FindWithTag("Player");
+                    if (player != null)
+                    {
+                        var combat = player.GetComponent<PlayerCombat>();
+                        if (combat != null)
+                            combat.SetWeapon(weapon);
+                    }
+                }
+            }
+
             Debug.Log("[RunManager] Run started.");
         }
 
@@ -85,6 +113,22 @@ namespace EverRealm.Exiles.Core
 
             // --- Build result ---
             var result = new RunResult(success, elapsed, _killCount, items);
+
+            // --- Persist to stash ---
+            var stash = GameBootstrap.Instance?.Stash;
+            if (stash != null)
+            {
+                stash.RecordRunEnd(result);
+                if (success)
+                    stash.TransferRunItems(result.Items);
+            }
+
+            // --- Destroy HUD ---
+            if (_gameHudInstance != null)
+            {
+                Destroy(_gameHudInstance);
+                _gameHudInstance = null;
+            }
 
             GameBootstrap.Instance?.SetState(GameState.RunEnd);
             Debug.Log($"[RunManager] Run ended — success: {success}, time: {elapsed:F1}s, kills: {_killCount}");

@@ -1,7 +1,9 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using EverRealm.Exiles.Data;
 using EverRealm.Exiles.Items;
+using EverRealm.Exiles.UI;
 using EverRealm.Exiles.World;
 
 namespace EverRealm.Exiles.Player
@@ -40,6 +42,18 @@ namespace EverRealm.Exiles.Player
         private Vector2 _moveInput;
         private bool    _sprintHeld;
         private bool    _snapped; // True once the player has been placed on terrain.
+        private float   _snapSettleTimer; // Seconds to settle after snap before allowing player movement.
+        private float   _lastTerrainY;    // Y of the terrain at snap — used for fall-through recovery.
+
+        // Interaction detection
+        private string _currentInteractPrompt = string.Empty;
+        public string CurrentInteractPrompt => _currentInteractPrompt;
+
+        /// <summary>Fires when the interaction prompt changes (including to empty).</summary>
+        public event Action<string> OnInteractPromptChanged;
+
+        // Inventory UI (cached on first toggle)
+        private InventoryUI _inventoryUI;
 
         // -------------------------------------------------------------------------
 
@@ -69,6 +83,33 @@ namespace EverRealm.Exiles.Player
                 return;
             }
 
+            // After snapping, hold the player on the surface for a short time
+            // while the CC establishes ground contact via tiny downward moves.
+            if (_snapSettleTimer > 0f)
+            {
+                _snapSettleTimer -= Time.deltaTime;
+                // Push the CC gently into the ground each frame so isGrounded becomes true.
+                _cc.Move(Vector3.down * 0.01f);
+                _mover.ResetVerticalVelocity();
+                return;
+            }
+
+            // Safety net: if the player falls well below the terrain they spawned on,
+            // they clipped through a mesh collider. Re-snap.
+            if (transform.position.y < _lastTerrainY - 5f)
+            {
+                Debug.LogWarning($"[PlayerController] Fell through terrain (y={transform.position.y:F1}, terrain={_lastTerrainY:F1}). Re-snapping.");
+                _cc.enabled = false;
+                _snapped = false;
+                transform.position = new Vector3(transform.position.x, 500f, transform.position.z);
+                return;
+            }
+
+            // After a scene transition the first few frames can have huge
+            // deltaTime spikes. Clamp so the CharacterController never
+            // moves far enough in one tick to clip through terrain.
+            float dt = Mathf.Min(Time.deltaTime, 0.05f);
+
             // Use camera yaw so WASD is relative to where the camera faces.
             float yaw = CameraPivot != null ? CameraPivot.eulerAngles.y : transform.eulerAngles.y;
 
@@ -77,10 +118,67 @@ namespace EverRealm.Exiles.Player
                 yaw,
                 _sprintHeld,
                 _cc.isGrounded,
-                Time.deltaTime
+                dt
             );
 
             _cc.Move(displacement);
+
+            DetectInteractable();
+        }
+
+        // -------------------------------------------------------------------------
+        // Interaction detection
+
+        /// <summary>
+        /// Per-frame raycast to detect what the player is aiming at,
+        /// updating the interaction prompt for the HUD.
+        /// </summary>
+        private void DetectInteractable()
+        {
+            string prompt = string.Empty;
+
+            if (TryRaycastInteractable(out RaycastHit hit))
+            {
+                // Check block entity first (chest, extraction point, etc.).
+                var bem = BlockEntityManager.Instance;
+                if (bem != null)
+                {
+                    Vector3Int blockPos = WorldManager.HitToBlockPos(hit);
+                    if (bem.TryGet(blockPos, out var blockEntity))
+                    {
+                        prompt = blockEntity.InteractPrompt;
+                    }
+                }
+
+                // Fall back to GameObject-based interactables.
+                if (string.IsNullOrEmpty(prompt))
+                {
+                    var interactable = hit.collider.GetComponentInParent<IInteractable>();
+                    if (interactable != null)
+                        prompt = interactable.InteractPrompt;
+                }
+            }
+
+            if (_currentInteractPrompt != prompt)
+            {
+                _currentInteractPrompt = prompt;
+                OnInteractPromptChanged?.Invoke(prompt);
+            }
+        }
+
+        /// <summary>Shared raycast used by both interaction detection and input handling.</summary>
+        private bool TryRaycastInteractable(out RaycastHit hit)
+        {
+            var cam = Camera.main;
+            if (cam == null)
+            {
+                hit = default;
+                return false;
+            }
+
+            Vector3 origin = transform.position + Vector3.up * 1f;
+            Vector3 dir = cam.transform.forward;
+            return Physics.Raycast(origin, dir, out hit, _interactRange, ~0, QueryTriggerInteraction.Collide);
         }
 
         // -------------------------------------------------------------------------
@@ -98,14 +196,26 @@ namespace EverRealm.Exiles.Player
 
             if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, castHeight * 2f))
             {
-                // Place player 3m above the surface — gravity will do the rest.
+                // Place the CC so its bottom sits exactly on the surface.
+                // ccBottom = local Y from transform.position to the CC's feet.
                 float ccBottom = _cc.center.y - _cc.height * 0.5f;
-                Vector3 spawnPos = hit.point + Vector3.up * (3f - ccBottom);
+                Vector3 spawnPos = hit.point - Vector3.up * ccBottom;
 
                 transform.position = spawnPos;
+                _lastTerrainY = hit.point.y;
+
+                Physics.SyncTransforms();
+
+                _mover.ResetVerticalVelocity();
+
                 _cc.enabled = true;
                 _snapped = true;
-                Debug.Log($"[PlayerController] Snapped to {spawnPos} (terrain hit: {hit.point}, CC bottom offset: {ccBottom})");
+
+                // Settle period: the CC will receive tiny downward moves each
+                // frame to establish isGrounded before real movement begins.
+                _snapSettleTimer = 0.25f;
+
+                Debug.Log($"[PlayerController] Snapped to {spawnPos} (terrain hit y={hit.point.y:F1})");
             }
         }
 
@@ -115,20 +225,18 @@ namespace EverRealm.Exiles.Player
         public void OnMove(InputValue value)    => _moveInput  = value.Get<Vector2>();
         public void OnSprint(InputValue value)  => _sprintHeld = value.isPressed;
         public void OnJump(InputValue value)    { if (value.isPressed) _mover.RequestJump(); }
-        public void OnLook(InputValue value)    { if (_playerCamera != null) _playerCamera.ApplyLookDelta(value.Get<Vector2>()); }
+        public void OnLook(InputValue value)
+        {
+            // Suppress look input while inventory is open.
+            if (_inventoryUI != null && _inventoryUI.IsOpen) return;
+            if (_playerCamera != null) _playerCamera.ApplyLookDelta(value.Get<Vector2>());
+        }
 
         public void OnInteract(InputValue value)
         {
             if (!value.isPressed) return;
 
-            var cam = Camera.main;
-            if (cam == null) return;
-
-            // Start from player center, aim in camera direction.
-            Vector3 origin = transform.position + Vector3.up * 1f;
-            Vector3 dir = cam.transform.forward;
-
-            if (!Physics.Raycast(origin, dir, out RaycastHit hit, _interactRange, ~0, QueryTriggerInteraction.Collide))
+            if (!TryRaycastInteractable(out RaycastHit hit))
                 return;
 
             // 1. Check for a block entity (chest, etc.) at the hit position.
@@ -146,6 +254,17 @@ namespace EverRealm.Exiles.Player
             // 2. Fall back to GameObject-based interactables (loot pickups, etc.).
             var interactable = hit.collider.GetComponentInParent<IInteractable>();
             interactable?.Interact(this);
+        }
+
+        public void OnInventory(InputValue value)
+        {
+            if (!value.isPressed) return;
+
+            if (_inventoryUI == null)
+                _inventoryUI = FindFirstObjectByType<InventoryUI>();
+
+            if (_inventoryUI != null)
+                _inventoryUI.Toggle();
         }
     }
 }

@@ -38,6 +38,9 @@ namespace EverRealm.Exiles.Player
             _stats = stats;
         }
 
+        /// <summary>Reset accumulated vertical velocity (e.g., after teleporting the player).</summary>
+        public void ResetVerticalVelocity() => _verticalVelocity = 0f;
+
         /// <summary>
         /// Call every frame. Returns the world-space displacement to pass to
         /// <see cref="CharacterController.Move"/> (already scaled by deltaTime).

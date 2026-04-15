@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 using TMPro;
 using EverRealm.Exiles.Core;
 using EverRealm.Exiles.Extraction;
@@ -25,6 +27,9 @@ namespace EverRealm.Exiles.UI
         [SerializeField] private Transform _itemListParent;
         [SerializeField] private GameObject _itemRowPrefab;
         [SerializeField] private TMP_Text _noItemsText;
+
+        [Header("Actions")]
+        [SerializeField] private Button _continueButton;
 
         private void Awake()
         {
@@ -71,6 +76,10 @@ namespace EverRealm.Exiles.UI
             if (_killsText != null)
                 _killsText.text = result.KillCount.ToString();
 
+            // --- Continue button ---
+            if (_continueButton != null)
+                _continueButton.onClick.AddListener(OnContinueClicked);
+
             // --- Item list ---
             if (result.Items != null && result.Items.Count > 0)
             {
@@ -101,6 +110,11 @@ namespace EverRealm.Exiles.UI
                         : "All items lost";
                 }
             }
+        }
+
+        private void OnContinueClicked()
+        {
+            SceneManager.LoadScene("MainMenu");
         }
 
     }

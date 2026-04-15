@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using EverRealm.Exiles.Combat;
@@ -39,6 +40,12 @@ namespace EverRealm.Exiles.Player
         public float Stamina      => _stamina;
         public float MaxStamina   => _stats.MaxStamina;
 
+        /// <summary>Fires when health changes. Args: (current, max).</summary>
+        public event Action<float, float> OnHealthChanged;
+
+        /// <summary>Fires when stamina changes. Args: (current, max).</summary>
+        public event Action<float, float> OnStaminaChanged;
+
         // -------------------------------------------------------------------------
 
         private void Awake()
@@ -52,6 +59,9 @@ namespace EverRealm.Exiles.Player
             _health  = _maxHealth;
             _stamina = _stats.MaxStamina;
 
+            OnHealthChanged?.Invoke(_health, _maxHealth);
+            OnStaminaChanged?.Invoke(_stamina, _stats.MaxStamina);
+
             if (_weapon != null)
                 _weaponCtrl.Equip(_weapon);
         }
@@ -60,9 +70,16 @@ namespace EverRealm.Exiles.Player
         {
             // Stamina regen
             if (_staminaRegenCooldown > 0f)
+            {
                 _staminaRegenCooldown -= Time.deltaTime;
+            }
             else
+            {
+                float prev = _stamina;
                 _stamina = Mathf.Min(_stamina + _stats.StaminaRegen * Time.deltaTime, _stats.MaxStamina);
+                if (_stamina != prev)
+                    OnStaminaChanged?.Invoke(_stamina, _stats.MaxStamina);
+            }
         }
 
         // -------------------------------------------------------------------------
@@ -75,10 +92,12 @@ namespace EverRealm.Exiles.Player
 
             _health -= info.Amount;
             Debug.Log($"[Player] Took {info.Amount} damage, health: {_health}/{_maxHealth}");
+            OnHealthChanged?.Invoke(_health, _maxHealth);
 
             if (_health <= 0f)
             {
                 _health = 0f;
+                OnHealthChanged?.Invoke(_health, _maxHealth);
                 Debug.Log("[Player] Died!");
                 RunManager.Instance?.EndRun(false);
             }
@@ -130,6 +149,19 @@ namespace EverRealm.Exiles.Player
         // -------------------------------------------------------------------------
 
         /// <summary>
+        /// Set the weapon at runtime (e.g., from loadout selection).
+        /// Falls back to inspector-assigned weapon if null.
+        /// </summary>
+        public void SetWeapon(WeaponDefinition weapon)
+        {
+            if (weapon != null)
+                _weapon = weapon;
+
+            if (_weaponCtrl != null && _weapon != null)
+                _weaponCtrl.Equip(_weapon);
+        }
+
+        /// <summary>
         /// Called by <see cref="PlayerController"/> after it creates the mover
         /// so combat can access dodge state.
         /// </summary>
@@ -139,6 +171,7 @@ namespace EverRealm.Exiles.Player
         {
             _stamina = Mathf.Max(0f, _stamina - amount);
             _staminaRegenCooldown = _stats.StaminaRegenDelay;
+            OnStaminaChanged?.Invoke(_stamina, _stats.MaxStamina);
         }
     }
 }

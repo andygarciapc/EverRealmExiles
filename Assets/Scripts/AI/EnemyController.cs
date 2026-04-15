@@ -2,6 +2,7 @@ using UnityEngine;
 using EverRealm.Exiles.Core;
 using EverRealm.Exiles.Data;
 using EverRealm.Exiles.Items;
+using EverRealm.Exiles.UI;
 
 namespace EverRealm.Exiles.AI
 {
@@ -26,6 +27,9 @@ namespace EverRealm.Exiles.AI
 
         [Header("Loot")]
         [SerializeField] private GameObject _lootPickupPrefab;
+
+        [Header("UI")]
+        [SerializeField] private GameObject _healthBarPrefab;
 
         public State CurrentState { get; private set; } = State.Patrol;
 
@@ -53,6 +57,15 @@ namespace EverRealm.Exiles.AI
 
             _attack.Init(_definition);
             _health.Init(_definition, this);
+
+            // Spawn world-space health bar.
+            if (_healthBarPrefab != null)
+            {
+                var barGo = Instantiate(_healthBarPrefab);
+                var bar = barGo.GetComponent<EnemyHealthBar>();
+                if (bar != null)
+                    bar.Init(_health, transform);
+            }
 
             _mover.SetSpeed(_definition.MoveSpeed);
             _spawnPoint = transform.position;

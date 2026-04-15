@@ -14,6 +14,9 @@ namespace EverRealm.Exiles.Core
         [field: SerializeField]
         public GameState CurrentState { get; private set; } = GameState.MainMenu;
 
+        private StashManager _stash;
+        public StashManager Stash => _stash ??= GetComponent<StashManager>();
+
         private void Awake()
         {
             if (Instance != null)

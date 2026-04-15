@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 90cff2970f5882b469358ff4524e8e15, type: 3}
   m_Name: Sword
   m_EditorClassIdentifier: Assembly-CSharp::EverRealm.Exiles.Data.WeaponDefinition
+  WeaponId: sword_iron
   WeaponName: Sword
   LightDamage: 15
   LightStamina: 10

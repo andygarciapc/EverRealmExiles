@@ -75,6 +75,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EverRealm.Exiles.AI.EnemyController
   _definition: {fileID: 11400000, guid: 8fb9e412fdcf8e943be6fd1f8d377901, type: 2}
   _lootPickupPrefab: {fileID: 8177180590342612331, guid: 23a5e7c14469b47469adbe5759c3e7ae, type: 3}
+  _healthBarPrefab: {fileID: 2995281830584163117, guid: 11702256bcff77c4ea280722e294a96a, type: 3}
 --- !u!136 &5743222519398087470
 CapsuleCollider:
   m_ObjectHideFlags: 0
