@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using EverRealm.Exiles.Data;
@@ -7,9 +8,11 @@ using EverRealm.Exiles.Items;
 namespace EverRealm.Exiles.Core
 {
     /// <summary>
-    /// Owns the persistent stash inventory and save data.
+    /// Owns the persistent stash inventory, equipment loadout, and save data.
     /// Lives on the GameBootstrap GameObject (DontDestroyOnLoad).
     /// Loads from disk once on first Awake; auto-saves on mutations.
+    /// Fires <see cref="OnStashChanged"/> and <see cref="OnLoadoutChanged"/>
+    /// whenever their respective contents change.
     /// </summary>
     public sealed class StashManager : MonoBehaviour
     {
@@ -18,14 +21,22 @@ namespace EverRealm.Exiles.Core
         [SerializeField] private BiomeRegistry _biomeRegistry;
 
         private Inventory _stash;
+        private Loadout _loadout;
         private SaveData _data;
         private bool _initialized;
 
         public Inventory Stash => _stash;
+        public Loadout Loadout => _loadout;
         public SaveData Stats => _data;
         public ItemRegistry ItemRegistry => _itemRegistry;
         public WeaponRegistry WeaponRegistry => _weaponRegistry;
         public BiomeRegistry BiomeRegistry => _biomeRegistry;
+
+        /// <summary>Fired when stash contents change (transfer, add, remove).</summary>
+        public event Action OnStashChanged;
+
+        /// <summary>Fired when loadout changes (equip, unequip, backpack mutation).</summary>
+        public event Action OnLoadoutChanged;
 
         // ---------------------------------------------------------------------
 
@@ -40,16 +51,63 @@ namespace EverRealm.Exiles.Core
 
             _data = SaveManager.Load();
             _stash = new Inventory(100);
+            _loadout = new Loadout(12);
 
             // Rebuild stash inventory from saved item stacks.
             foreach (var saved in _data.StashItems)
             {
                 var def = _itemRegistry.GetById(saved.ItemId);
-                if (def == null) continue; // item was removed from the game
+                if (def == null)
+                {
+                    Debug.LogWarning($"[StashManager] Skipping unknown stash item '{saved.ItemId}' during load.");
+                    continue;
+                }
                 _stash.Add(def, saved.Count);
             }
 
-            Debug.Log($"[StashManager] Initialized — {_stash.SlotCount} stash slots, {_data.TotalRuns} total runs.");
+            // Rebuild equipment from saved loadout.
+            foreach (var saved in _data.EquippedItems)
+            {
+                var def = _itemRegistry.GetById(saved.ItemId);
+                if (def == null)
+                {
+                    Debug.LogWarning($"[StashManager] Skipping unknown equipped item '{saved.ItemId}' during load.");
+                    continue;
+                }
+
+                if (!System.Enum.TryParse<EquipSlot>(saved.SlotName, out var slot))
+                {
+                    Debug.LogWarning($"[StashManager] Skipping unknown equip slot '{saved.SlotName}' during load.");
+                    continue;
+                }
+
+                _loadout.TryEquip(new ItemStack(def, saved.Count));
+            }
+
+            // Rebuild backpack from saved data.
+            foreach (var saved in _data.BackpackItems)
+            {
+                var def = _itemRegistry.GetById(saved.ItemId);
+                if (def == null)
+                {
+                    Debug.LogWarning($"[StashManager] Skipping unknown backpack item '{saved.ItemId}' during load.");
+                    continue;
+                }
+                _loadout.Backpack.Add(def, saved.Count);
+            }
+
+            // Subscribe to loadout changes for auto-save.
+            _loadout.OnChanged += OnLoadoutMutated;
+
+            Debug.Log($"[StashManager] Initialized — {_stash.SlotCount} stash slots, " +
+                      $"{_data.EquippedItems.Count} equipped, {_data.BackpackItems.Count} backpack, " +
+                      $"{_data.TotalRuns} total runs.");
+        }
+
+        private void OnLoadoutMutated()
+        {
+            Save();
+            OnLoadoutChanged?.Invoke();
         }
 
         // ---------------------------------------------------------------------
@@ -77,33 +135,143 @@ namespace EverRealm.Exiles.Core
         /// </summary>
         public void TransferRunItems(IReadOnlyList<ItemStack> items)
         {
+            int transferred = 0;
+
             foreach (var stack in items)
             {
                 if (stack.IsEmpty) continue;
+
+                if (stack.Definition == null)
+                {
+                    Debug.LogWarning("[StashManager] Skipping null-definition item during transfer.");
+                    continue;
+                }
+
                 _stash.Add(stack.Definition, stack.Count);
+                transferred++;
             }
 
             Save();
-            Debug.Log($"[StashManager] Transferred {items.Count} item stacks to stash.");
+            OnStashChanged?.Invoke();
+            Debug.Log($"[StashManager] Transferred {transferred} item stacks to stash.");
         }
 
         // ---------------------------------------------------------------------
-        // Loadout
+        // Loadout — equip / unequip
+
+        /// <summary>
+        /// Move an item from stash to loadout. Equippable items go to their
+        /// equipment slot (swapping any existing item back to stash).
+        /// Non-equippable items go to the backpack.
+        /// Returns true if the item was successfully moved.
+        /// </summary>
+        public bool EquipFromStash(string itemId)
+        {
+            var def = _itemRegistry.GetById(itemId);
+            if (def == null) return false;
+
+            int removed = _stash.Remove(def, 1);
+            if (removed == 0) return false;
+
+            var stack = new ItemStack(def, 1);
+
+            if (def.EquipSlot != EquipSlot.None)
+            {
+                var displaced = _loadout.TryEquip(stack);
+                if (!displaced.IsEmpty && displaced.Definition != null)
+                    _stash.Add(displaced.Definition, displaced.Count);
+            }
+            else
+            {
+                int overflow = _loadout.Backpack.Add(def, 1);
+                if (overflow > 0)
+                {
+                    // Backpack full — return item to stash.
+                    _stash.Add(def, 1);
+                    return false;
+                }
+            }
+
+            Save();
+            OnStashChanged?.Invoke();
+            OnLoadoutChanged?.Invoke();
+            return true;
+        }
+
+        /// <summary>
+        /// Move an equipped item from a loadout slot back to stash.
+        /// Returns true if an item was moved.
+        /// </summary>
+        public bool UnequipToStash(EquipSlot slot)
+        {
+            var item = _loadout.Unequip(slot);
+            if (item.IsEmpty || item.Definition == null) return false;
+
+            _stash.Add(item.Definition, item.Count);
+            Save();
+            OnStashChanged?.Invoke();
+            OnLoadoutChanged?.Invoke();
+            return true;
+        }
+
+        /// <summary>
+        /// Move an item from the backpack back to stash.
+        /// Returns true if an item was moved.
+        /// </summary>
+        public bool RemoveFromBackpack(string itemId)
+        {
+            var def = _itemRegistry.GetById(itemId);
+            if (def == null) return false;
+
+            int removed = _loadout.Backpack.Remove(def, 1);
+            if (removed == 0) return false;
+
+            _stash.Add(def, 1);
+            Save();
+            OnStashChanged?.Invoke();
+            OnLoadoutChanged?.Invoke();
+            return true;
+        }
+
+        // ---------------------------------------------------------------------
+        // Weapon selection (reads from loadout, falls back to legacy)
 
         /// <summary>
         /// Get the weapon selected for the next run.
+        /// Reads from the equipped primary weapon first, then falls
+        /// back to the legacy SelectedWeaponId for backward compatibility.
         /// Returns null if none selected (caller should use default).
         /// </summary>
         public WeaponDefinition GetSelectedWeapon()
         {
-            if (string.IsNullOrEmpty(_data.SelectedWeaponId))
-                return null;
+            // New path: read from loadout equipment.
+            var primary = _loadout.GetEquipped(EquipSlot.PrimaryWeapon);
+            if (!primary.IsEmpty && primary.Definition != null && primary.Definition.LinkedWeapon != null)
+                return primary.Definition.LinkedWeapon;
 
-            return _weaponRegistry.GetById(_data.SelectedWeaponId);
+            // Legacy fallback.
+            if (!string.IsNullOrEmpty(_data.SelectedWeaponId))
+                return _weaponRegistry.GetById(_data.SelectedWeaponId);
+
+            return null;
+        }
+
+        /// <summary>
+        /// Get the secondary weapon for the next run (if equipped).
+        /// Returns null if no secondary weapon is equipped.
+        /// </summary>
+        public WeaponDefinition GetSecondaryWeapon()
+        {
+            var secondary = _loadout.GetEquipped(EquipSlot.SecondaryWeapon);
+            if (!secondary.IsEmpty && secondary.Definition != null && secondary.Definition.LinkedWeapon != null)
+                return secondary.Definition.LinkedWeapon;
+
+            return null;
         }
 
         /// <summary>
         /// Set the weapon for the next run by WeaponId. Persists immediately.
+        /// Legacy path — prefer equipping via EquipFromStash.
         /// </summary>
         public void SetSelectedWeapon(string weaponId)
         {
@@ -146,16 +314,36 @@ namespace EverRealm.Exiles.Core
         // Persistence
 
         /// <summary>
-        /// Convert runtime stash to saved format and write to disk.
+        /// Convert runtime stash and loadout to saved format and write to disk.
         /// </summary>
         public void Save()
         {
+            // Stash.
             _data.StashItems.Clear();
-
             foreach (var slot in _stash.Slots)
             {
                 if (slot.IsEmpty || slot.Definition == null) continue;
                 _data.StashItems.Add(new SavedItemStack(slot.Definition.ItemId, slot.Count));
+            }
+
+            // Equipment.
+            _data.EquippedItems.Clear();
+            foreach (var kvp in _loadout.Equipment)
+            {
+                if (kvp.Value.IsEmpty || kvp.Value.Definition == null) continue;
+                _data.EquippedItems.Add(new SavedEquipSlot(
+                    kvp.Key.ToString(),
+                    kvp.Value.Definition.ItemId,
+                    kvp.Value.Count
+                ));
+            }
+
+            // Backpack.
+            _data.BackpackItems.Clear();
+            foreach (var slot in _loadout.Backpack.Slots)
+            {
+                if (slot.IsEmpty || slot.Definition == null) continue;
+                _data.BackpackItems.Add(new SavedItemStack(slot.Definition.ItemId, slot.Count));
             }
 
             SaveManager.Save(_data);

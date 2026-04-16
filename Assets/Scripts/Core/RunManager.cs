@@ -51,19 +51,34 @@ namespace EverRealm.Exiles.Core
             if (_gameHudPrefab != null && _gameHudInstance == null)
                 _gameHudInstance = Instantiate(_gameHudPrefab);
 
-            // Inject loadout weapon from persistent save.
+            // Inject loadout from persistent save.
             var stash = GameBootstrap.Instance?.Stash;
             if (stash != null)
             {
-                var weapon = stash.GetSelectedWeapon();
-                if (weapon != null)
+                var player = GameObject.FindWithTag("Player");
+                if (player != null)
                 {
-                    var player = GameObject.FindWithTag("Player");
-                    if (player != null)
+                    // Apply weapon.
+                    var weapon = stash.GetSelectedWeapon();
+                    var combat = player.GetComponent<PlayerCombat>();
+                    if (combat != null)
                     {
-                        var combat = player.GetComponent<PlayerCombat>();
-                        if (combat != null)
+                        if (weapon != null)
                             combat.SetWeapon(weapon);
+
+                        // Apply armor defense from equipped gear.
+                        combat.SetArmorDefense(stash.Loadout.TotalDefense);
+                    }
+
+                    // Seed player inventory with backpack items.
+                    var playerInv = player.GetComponent<PlayerInventory>();
+                    if (playerInv != null)
+                    {
+                        foreach (var slot in stash.Loadout.Backpack.Slots)
+                        {
+                            if (!slot.IsEmpty)
+                                playerInv.TryAdd(slot.Definition, slot.Count);
+                        }
                     }
                 }
             }
@@ -121,6 +136,11 @@ namespace EverRealm.Exiles.Core
                 stash.RecordRunEnd(result);
                 if (success)
                     stash.TransferRunItems(result.Items);
+
+                // Clear backpack — items were seeded into PlayerInventory at run start.
+                // On success they're transferred via TransferRunItems; on failure they're lost.
+                stash.Loadout.ClearBackpack();
+                stash.Save();
             }
 
             // --- Destroy HUD ---

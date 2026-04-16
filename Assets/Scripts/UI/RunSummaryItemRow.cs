@@ -7,22 +7,25 @@ namespace EverRealm.Exiles.UI
 {
     /// <summary>
     /// Displays a single item stack in the run summary list.
-    /// Attach to a prefab with Image (icon), TMP_Text (name), TMP_Text (count).
+    /// Supports both <see cref="ItemViewData"/> and raw <see cref="ItemStack"/>.
     /// </summary>
     public sealed class RunSummaryItemRow : MonoBehaviour
     {
         [SerializeField] private Image _icon;
         [SerializeField] private TMP_Text _nameText;
         [SerializeField] private TMP_Text _countText;
+        [SerializeField] private Image _rarityBar;
 
-        public void Populate(ItemStack stack)
+        /// <summary>Populate from presentation data (preferred path).</summary>
+        public void Populate(ItemViewData data)
         {
             if (_icon != null)
             {
-                if (stack.Definition.Icon != null)
+                if (data.HasIcon)
                 {
-                    _icon.sprite = stack.Definition.Icon;
+                    _icon.sprite = data.Icon;
                     _icon.enabled = true;
+                    _icon.color = Color.white;
                 }
                 else
                 {
@@ -31,10 +34,28 @@ namespace EverRealm.Exiles.UI
             }
 
             if (_nameText != null)
-                _nameText.text = stack.Definition.DisplayName;
+            {
+                _nameText.text = data.DisplayName;
+                _nameText.color = data.RarityColor;
+            }
 
             if (_countText != null)
-                _countText.text = stack.Count > 1 ? $"x{stack.Count}" : string.Empty;
+                _countText.text = data.Count > 1 ? $"x{data.Count}" : string.Empty;
+
+            if (_rarityBar != null)
+                _rarityBar.color = data.RarityColor;
+        }
+
+        /// <summary>Populate from a raw ItemStack (backwards compatible).</summary>
+        public void Populate(ItemStack stack)
+        {
+            if (stack.IsEmpty || stack.Definition == null)
+            {
+                Populate(ItemViewData.Invalid);
+                return;
+            }
+
+            Populate(ItemViewData.FromStack(stack));
         }
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using EverRealm.Exiles.Items;
@@ -6,8 +7,9 @@ using EverRealm.Exiles.Player;
 namespace EverRealm.Exiles.UI
 {
     /// <summary>
-    /// Toggleable inventory panel. Rebuilds the slot grid from the player's
-    /// inventory each time it opens and whenever inventory contents change.
+    /// Toggleable in-run inventory panel. Uses <see cref="InventoryPresenter"/>
+    /// to convert runtime inventory state into <see cref="ItemViewData"/> and
+    /// renders it via pooled <see cref="InventorySlotUI"/> instances.
     /// </summary>
     public sealed class InventoryUI : MonoBehaviour
     {
@@ -19,9 +21,18 @@ namespace EverRealm.Exiles.UI
         [Header("Panel")]
         [SerializeField] private CanvasGroup _canvasGroup;
 
-        private PlayerInventory _inventory;
+        [Header("Tooltip")]
+        [SerializeField] private ItemTooltipUI _tooltip;
+
+        [Header("Display")]
+        [SerializeField] private int _displaySlotCount = 20;
+
+        private PlayerInventory _playerInventory;
         private PlayerCamera _playerCamera;
+        private InventoryPresenter _presenter;
+        private readonly List<InventorySlotUI> _slotInstances = new();
         private bool _isOpen;
+        private int _selectedSlotIndex = -1;
 
         // -----------------------------------------------------------------
 
@@ -30,30 +41,38 @@ namespace EverRealm.Exiles.UI
             var player = GameObject.FindWithTag("Player");
             if (player != null)
             {
-                _inventory = player.GetComponent<PlayerInventory>();
+                _playerInventory = player.GetComponent<PlayerInventory>();
                 _playerCamera = player.GetComponentInChildren<PlayerCamera>();
             }
 
-            if (_inventory != null)
-                _inventory.Inventory.OnChanged += OnInventoryChanged;
+            if (_playerInventory != null)
+            {
+                _presenter = new InventoryPresenter(
+                    _playerInventory.Inventory, _displaySlotCount);
+                _presenter.OnRefreshed += OnPresenterRefreshed;
+            }
 
-            // Start closed.
             SetOpen(false);
         }
 
         private void OnDestroy()
         {
-            if (_inventory != null)
-                _inventory.Inventory.OnChanged -= OnInventoryChanged;
+            if (_presenter != null)
+            {
+                _presenter.OnRefreshed -= OnPresenterRefreshed;
+                _presenter.Dispose();
+            }
         }
 
         // -----------------------------------------------------------------
 
-        /// <summary>Toggle the inventory panel open/closed.</summary>
+        /// <summary>Toggle the inventory panel open / closed.</summary>
         public void Toggle()
         {
             SetOpen(!_isOpen);
         }
+
+        public bool IsOpen => _isOpen;
 
         private void SetOpen(bool open)
         {
@@ -66,19 +85,23 @@ namespace EverRealm.Exiles.UI
                 _canvasGroup.interactable = open;
             }
 
-            // Cursor and camera control.
             if (_playerCamera != null)
                 _playerCamera.SetCursorLocked(!open);
 
             if (open)
-                Rebuild();
+            {
+                _presenter?.Refresh();
+            }
+            else
+            {
+                _selectedSlotIndex = -1;
+                _tooltip?.Hide();
+            }
         }
-
-        public bool IsOpen => _isOpen;
 
         // -----------------------------------------------------------------
 
-        private void OnInventoryChanged()
+        private void OnPresenterRefreshed()
         {
             if (_isOpen)
                 Rebuild();
@@ -86,26 +109,65 @@ namespace EverRealm.Exiles.UI
 
         private void Rebuild()
         {
-            if (_slotContainer == null || _slotPrefab == null) return;
+            if (_slotContainer == null || _slotPrefab == null || _presenter == null)
+                return;
 
-            // Clear existing slots.
-            for (int i = _slotContainer.childCount - 1; i >= 0; i--)
-                Destroy(_slotContainer.GetChild(i).gameObject);
+            var viewData = _presenter.ViewData;
 
-            if (_inventory == null) return;
-
-            var slots = _inventory.Inventory.Slots;
-
+            // Title with occupied / capacity.
             if (_titleText != null)
-                _titleText.text = $"Inventory ({slots.Count})";
+                _titleText.text = $"Inventory ({_presenter.OccupiedSlots}/{_displaySlotCount})";
 
-            for (int i = 0; i < slots.Count; i++)
+            // Pool-friendly slot creation.
+            EnsureSlotCount(viewData.Count);
+
+            for (int i = 0; i < viewData.Count; i++)
+            {
+                _slotInstances[i].Populate(viewData[i], i);
+                _slotInstances[i].SetSelected(i == _selectedSlotIndex);
+                _slotInstances[i].gameObject.SetActive(true);
+            }
+
+            // Hide any excess pool entries.
+            for (int i = viewData.Count; i < _slotInstances.Count; i++)
+                _slotInstances[i].gameObject.SetActive(false);
+        }
+
+        private void EnsureSlotCount(int needed)
+        {
+            while (_slotInstances.Count < needed)
             {
                 var go = Instantiate(_slotPrefab, _slotContainer);
-                var slotUI = go.GetComponent<InventorySlotUI>();
-                if (slotUI != null)
-                    slotUI.Populate(slots[i]);
+                var slot = go.GetComponent<InventorySlotUI>();
+                if (slot != null)
+                {
+                    slot.OnSlotClicked += OnSlotClicked;
+                    slot.OnSlotHoverEnter += OnSlotHoverEnter;
+                    slot.OnSlotHoverExit += OnSlotHoverExit;
+                    _slotInstances.Add(slot);
+                }
             }
+        }
+
+        // -----------------------------------------------------------------
+        // Slot interaction
+
+        private void OnSlotClicked(int index, ItemViewData data)
+        {
+            _selectedSlotIndex = _selectedSlotIndex == index ? -1 : index;
+
+            for (int i = 0; i < _slotInstances.Count; i++)
+                _slotInstances[i].SetSelected(i == _selectedSlotIndex);
+        }
+
+        private void OnSlotHoverEnter(InventorySlotUI slot)
+        {
+            _tooltip?.Show(slot.Data, slot.GetComponent<RectTransform>());
+        }
+
+        private void OnSlotHoverExit(InventorySlotUI slot)
+        {
+            _tooltip?.Hide();
         }
     }
 }

@@ -16,6 +16,11 @@ MonoBehaviour:
   DisplayName: Iron Sword
   Icon: {fileID: 0}
   Rarity: 0
+  Type: 2
+  Description: A sword made of iron
+  EquipSlot: 4
+  DefenseValue: 0
+  LinkedWeapon: {fileID: 11400000, guid: 90e4c9d202e748d45bd5ae1eab2473ee, type: 2}
   Stackable: 0
   MaxStack: 1
   Weight: 3

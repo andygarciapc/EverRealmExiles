@@ -16,6 +16,8 @@ MonoBehaviour:
   DisplayName: Cloth
   Icon: {fileID: 0}
   Rarity: 0
+  Type: 3
+  Description: A piece of fabric
   Stackable: 1
   MaxStack: 50
   Weight: 0.3

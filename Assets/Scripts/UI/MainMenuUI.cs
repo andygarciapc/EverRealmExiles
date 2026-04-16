@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using TMPro;
+using UnityEngine.InputSystem;
 using EverRealm.Exiles.Core;
 using EverRealm.Exiles.Data;
 
@@ -49,9 +50,13 @@ namespace EverRealm.Exiles.UI
         [SerializeField] private Image _selectedBiomePreview;
         [SerializeField] private Button _launchButton;
 
-        // ----- Exile Tab — reuse HideoutUI -----
+        // ----- Exile Tab — Character info -----
         [Header("Exile Tab")]
-        [SerializeField] private HideoutUI _hideoutUI;
+        [SerializeField] private ExileTabUI _exileTabUI;
+
+        // ----- Inventory / Loadout Overlay (Tab key) -----
+        [Header("Inventory Overlay")]
+        [SerializeField] private MainMenuInventoryUI _inventoryOverlay;
 
         // ----- Runtime state -----
         private StashManager _stash;
@@ -86,9 +91,13 @@ namespace EverRealm.Exiles.UI
             PopulateMap();
             RestoreSelectedBiome();
 
-            // Show the Exile tab's stash/loadout/stats via HideoutUI.
-            if (_hideoutUI != null)
-                _hideoutUI.Show(stash);
+            // Exile tab — character info.
+            if (_exileTabUI != null)
+                _exileTabUI.Show(stash);
+
+            // Inventory overlay — initialized but hidden until Tab pressed.
+            if (_inventoryOverlay != null)
+                _inventoryOverlay.Initialize(stash);
 
             // Wire launch button.
             if (_launchButton != null)
@@ -97,6 +106,17 @@ namespace EverRealm.Exiles.UI
             // Default to Play tab.
             SwitchTab(0);
             Debug.Log("[MainMenuUI] Show() complete — Play tab active.");
+        }
+
+        // ---------------------------------------------------------------------
+
+        private void Update()
+        {
+            if (Keyboard.current != null && Keyboard.current[Key.Tab].wasPressedThisFrame)
+            {
+                if (_inventoryOverlay != null)
+                    _inventoryOverlay.Toggle();
+            }
         }
 
         // ---------------------------------------------------------------------

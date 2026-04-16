@@ -16,6 +16,8 @@ MonoBehaviour:
   DisplayName: Iron Ore
   Icon: {fileID: 0}
   Rarity: 0
+  Type: 0
+  Description: A piece of iron, impure
   Stackable: 1
   MaxStack: 50
   Weight: 2

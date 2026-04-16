@@ -16,6 +16,8 @@ MonoBehaviour:
   DisplayName: Healing Potion
   Icon: {fileID: 0}
   Rarity: 0
+  Type: 3
+  Description: A drink to heal your wounds
   Stackable: 1
   MaxStack: 10
   Weight: 0.5

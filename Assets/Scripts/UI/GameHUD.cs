@@ -196,8 +196,9 @@ namespace EverRealm.Exiles.UI
         {
             if (_lootNotification == null) return;
 
+            string name = stack.Definition != null ? stack.Definition.DisplayName : "???";
             string countStr = stack.Count > 1 ? $" x{stack.Count}" : "";
-            _lootNotification.text = $"+ {stack.Definition.DisplayName}{countStr}";
+            _lootNotification.text = $"+ {name}{countStr}";
             SetTextAlpha(_lootNotification, 1f);
             _lootTimer = _lootDisplayDuration + _lootFadeDuration;
         }

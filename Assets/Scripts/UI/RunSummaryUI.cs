@@ -4,14 +4,13 @@ using UnityEngine.InputSystem.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
-using EverRealm.Exiles.Core;
 using EverRealm.Exiles.Extraction;
 
 namespace EverRealm.Exiles.UI
 {
     /// <summary>
     /// Full-screen overlay shown at the end of a run.
-    /// Displays success/failure, stats, and the item list.
+    /// Displays success/failure, stats, total loot value, and item list.
     /// </summary>
     public sealed class RunSummaryUI : MonoBehaviour
     {
@@ -22,6 +21,7 @@ namespace EverRealm.Exiles.UI
         [Header("Stats")]
         [SerializeField] private TMP_Text _timeText;
         [SerializeField] private TMP_Text _killsText;
+        [SerializeField] private TMP_Text _totalValueText;
 
         [Header("Items")]
         [SerializeField] private Transform _itemListParent;
@@ -81,6 +81,8 @@ namespace EverRealm.Exiles.UI
                 _continueButton.onClick.AddListener(OnContinueClicked);
 
             // --- Item list ---
+            int totalValue = 0;
+
             if (result.Items != null && result.Items.Count > 0)
             {
                 if (_noItemsText != null)
@@ -93,10 +95,15 @@ namespace EverRealm.Exiles.UI
                 {
                     foreach (var stack in result.Items)
                     {
+                        if (stack.IsEmpty) continue;
+
+                        var viewData = ItemViewData.FromStack(stack);
+                        totalValue += viewData.Value * viewData.Count;
+
                         var row = Instantiate(_itemRowPrefab, _itemListParent);
                         var rowUI = row.GetComponent<RunSummaryItemRow>();
                         if (rowUI != null)
-                            rowUI.Populate(stack);
+                            rowUI.Populate(viewData);
                     }
                 }
             }
@@ -110,12 +117,19 @@ namespace EverRealm.Exiles.UI
                         : "All items lost";
                 }
             }
+
+            // --- Total value ---
+            if (_totalValueText != null)
+            {
+                _totalValueText.text = result.Success
+                    ? $"Total Value: {totalValue}g"
+                    : "Total Value: 0g";
+            }
         }
 
         private void OnContinueClicked()
         {
             SceneManager.LoadScene("MainMenu");
         }
-
     }
 }

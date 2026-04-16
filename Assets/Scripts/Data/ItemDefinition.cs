@@ -15,6 +15,21 @@ namespace EverRealm.Exiles.Data
         public string DisplayName;
         public Sprite Icon;
         public ItemRarity Rarity = ItemRarity.Common;
+        public ItemType Type = ItemType.Misc;
+
+        [Header("Description")]
+        [TextArea(2, 4)]
+        public string Description = "";
+
+        [Header("Equipment")]
+        [Tooltip("Which equipment slot this item occupies. None = not equippable.")]
+        public EquipSlot EquipSlot = EquipSlot.None;
+
+        [Tooltip("Damage reduction when equipped as armor (flat subtracted from incoming damage).")]
+        public float DefenseValue = 0f;
+
+        [Tooltip("Link to WeaponDefinition for weapon-type items. Null for non-weapons.")]
+        public WeaponDefinition LinkedWeapon;
 
         [Header("Stacking")]
         public bool Stackable = true;

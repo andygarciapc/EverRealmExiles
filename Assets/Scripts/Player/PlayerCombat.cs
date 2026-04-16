@@ -34,6 +34,7 @@ namespace EverRealm.Exiles.Player
         private float _health;
         private float _stamina;
         private float _staminaRegenCooldown;
+        private float _armorDefense;
 
         public float Health       => _health;
         public float MaxHealth    => _maxHealth;
@@ -90,7 +91,8 @@ namespace EverRealm.Exiles.Player
             // Dodge i-frames
             if (_mover != null && _mover.HasIFrames) return;
 
-            _health -= info.Amount;
+            float mitigated = Mathf.Max(0f, info.Amount - _armorDefense);
+            _health -= mitigated;
             Debug.Log($"[Player] Took {info.Amount} damage, health: {_health}/{_maxHealth}");
             OnHealthChanged?.Invoke(_health, _maxHealth);
             Combat.CombatFeedback.Instance?.OnPlayerTookDamage(info);
@@ -149,6 +151,15 @@ namespace EverRealm.Exiles.Player
         }
 
         // -------------------------------------------------------------------------
+
+        /// <summary>
+        /// Set total armor defense from equipped gear.
+        /// Called by RunManager at run start.
+        /// </summary>
+        public void SetArmorDefense(float defense)
+        {
+            _armorDefense = Mathf.Max(0f, defense);
+        }
 
         /// <summary>
         /// Set the weapon at runtime (e.g., from loadout selection).

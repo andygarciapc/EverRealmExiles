@@ -5,14 +5,14 @@ using UnityEngine.SceneManagement;
 using TMPro;
 using EverRealm.Exiles.Core;
 using EverRealm.Exiles.Data;
-using EverRealm.Exiles.Items;
 
 namespace EverRealm.Exiles.UI
 {
     /// <summary>
-    /// Main menu hub (Arc Raiders–style). Shows the persistent stash, weapon loadout
-    /// selection, lifetime stats, and game mode buttons (Solo / Multiplayer).
-    /// This is the primary menu the player returns to between runs.
+    /// Main menu hub (Arc Raiders-style). Shows the persistent stash via
+    /// <see cref="StashPresenter"/>, weapon loadout selection, lifetime stats,
+    /// and game-mode buttons. This is the primary menu the player returns to
+    /// between runs.
     /// </summary>
     public sealed class HideoutUI : MonoBehaviour
     {
@@ -20,6 +20,9 @@ namespace EverRealm.Exiles.UI
         [SerializeField] private Transform _stashSlotContainer;
         [SerializeField] private GameObject _stashSlotPrefab;
         [SerializeField] private TMP_Text _stashTitle;
+
+        [Header("Tooltip")]
+        [SerializeField] private ItemTooltipUI _tooltip;
 
         [Header("Loadout")]
         [SerializeField] private Transform _weaponListContainer;
@@ -33,13 +36,15 @@ namespace EverRealm.Exiles.UI
         [SerializeField] private Button _multiplayerButton;
 
         private StashManager _stash;
+        private StashPresenter _presenter;
         private readonly List<WeaponButtonUI> _weaponButtons = new();
+        private readonly List<InventorySlotUI> _slotInstances = new();
 
         // ---------------------------------------------------------------------
 
         /// <summary>
         /// Populate the hub with stash contents, weapon choices, stats, and wire buttons.
-        /// Accepts null stash gracefully — buttons still work, content is empty.
+        /// Accepts null stash gracefully.
         /// </summary>
         public void Show(StashManager stash)
         {
@@ -48,45 +53,84 @@ namespace EverRealm.Exiles.UI
 
             if (_stash != null)
             {
-                PopulateStash();
+                _presenter = new StashPresenter(_stash);
+                _presenter.OnRefreshed += OnStashRefreshed;
+
                 PopulateWeapons();
                 PopulateStats();
             }
 
             if (_soloButton != null)
-            {
                 _soloButton.onClick.AddListener(OnSoloClicked);
-            }
 
-            // Multiplayer is a future feature — button is visible but not interactable.
+            // Multiplayer is a future feature.
             if (_multiplayerButton != null)
                 _multiplayerButton.interactable = false;
+        }
+
+        private void OnDestroy()
+        {
+            if (_presenter != null)
+            {
+                _presenter.OnRefreshed -= OnStashRefreshed;
+                _presenter.Dispose();
+            }
         }
 
         // ---------------------------------------------------------------------
         // Stash display
 
-        private void PopulateStash()
+        private void OnStashRefreshed()
         {
-            if (_stashSlotContainer == null || _stashSlotPrefab == null) return;
+            RebuildStashSlots();
+            PopulateStats();
+        }
 
-            // Clear existing slots.
-            for (int i = _stashSlotContainer.childCount - 1; i >= 0; i--)
-                Destroy(_stashSlotContainer.GetChild(i).gameObject);
+        private void RebuildStashSlots()
+        {
+            if (_stashSlotContainer == null || _stashSlotPrefab == null || _presenter == null)
+                return;
 
-            int count = 0;
-            foreach (var slot in _stash.Stash.Slots)
-            {
-                if (slot.IsEmpty) continue;
-                var go = Instantiate(_stashSlotPrefab, _stashSlotContainer);
-                var slotUI = go.GetComponent<InventorySlotUI>();
-                if (slotUI != null)
-                    slotUI.Populate(slot);
-                count++;
-            }
+            var viewData = _presenter.ViewData;
 
             if (_stashTitle != null)
-                _stashTitle.text = $"Stash ({count})";
+                _stashTitle.text = $"Stash ({_presenter.OccupiedSlots})";
+
+            EnsureStashSlotCount(viewData.Count);
+
+            for (int i = 0; i < viewData.Count; i++)
+            {
+                _slotInstances[i].Populate(viewData[i], i);
+                _slotInstances[i].gameObject.SetActive(true);
+            }
+
+            for (int i = viewData.Count; i < _slotInstances.Count; i++)
+                _slotInstances[i].gameObject.SetActive(false);
+        }
+
+        private void EnsureStashSlotCount(int needed)
+        {
+            while (_slotInstances.Count < needed)
+            {
+                var go = Instantiate(_stashSlotPrefab, _stashSlotContainer);
+                var slot = go.GetComponent<InventorySlotUI>();
+                if (slot != null)
+                {
+                    slot.OnSlotHoverEnter += OnSlotHoverEnter;
+                    slot.OnSlotHoverExit += OnSlotHoverExit;
+                    _slotInstances.Add(slot);
+                }
+            }
+        }
+
+        private void OnSlotHoverEnter(InventorySlotUI slot)
+        {
+            _tooltip?.Show(slot.Data, slot.GetComponent<RectTransform>());
+        }
+
+        private void OnSlotHoverExit(InventorySlotUI slot)
+        {
+            _tooltip?.Hide();
         }
 
         // ---------------------------------------------------------------------
@@ -96,7 +140,6 @@ namespace EverRealm.Exiles.UI
         {
             if (_weaponListContainer == null || _weaponButtonPrefab == null) return;
 
-            // Clear existing buttons.
             for (int i = _weaponListContainer.childCount - 1; i >= 0; i--)
                 Destroy(_weaponListContainer.GetChild(i).gameObject);
             _weaponButtons.Clear();
@@ -112,7 +155,8 @@ namespace EverRealm.Exiles.UI
                 var btn = go.GetComponent<WeaponButtonUI>();
                 if (btn == null) continue;
 
-                bool isSelected = selectedWeapon != null && selectedWeapon.WeaponId == weapon.WeaponId;
+                bool isSelected = selectedWeapon != null
+                    && selectedWeapon.WeaponId == weapon.WeaponId;
                 btn.Populate(weapon, isSelected);
                 _weaponButtons.Add(btn);
 
@@ -134,13 +178,15 @@ namespace EverRealm.Exiles.UI
 
         private void PopulateStats()
         {
-            if (_statsText == null || _stash.Stats == null) return;
+            if (_statsText == null || _stash?.Stats == null) return;
 
             var s = _stash.Stats;
             int minutes = Mathf.FloorToInt(s.TotalPlayTime / 60f);
+            int stashValue = _presenter?.TotalValue ?? 0;
+
             _statsText.text =
                 $"Runs: {s.TotalRuns}  |  Extractions: {s.TotalExtractions}  |  " +
-                $"Kills: {s.TotalKills}  |  Time: {minutes}m";
+                $"Kills: {s.TotalKills}  |  Time: {minutes}m  |  Stash: {stashValue}g";
         }
 
         // ---------------------------------------------------------------------

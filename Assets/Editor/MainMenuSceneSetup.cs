@@ -722,15 +722,18 @@ public static class MainMenuSceneSetup
         craftPanel.SetActive(false);
         CreatePlaceholderLabel(craftPanel.transform, "CRAFTING", "Coming Soon", font);
 
-        // --- Exile Panel (stash + loadout + stats) ---
+        // --- Exile Panel (character info) ---
         var exilePanel = CreateContentPanel(contentArea.transform, "ExilePanel");
         exilePanel.SetActive(false);
-        var exileContent = BuildExilePanel(exilePanel.transform, font, slotPrefab, weaponBtnPrefab);
+        var exileContent = BuildExilePanel(exilePanel.transform, font);
 
         // --- Shop Panel (placeholder) ---
         var shopPanel = CreateContentPanel(contentArea.transform, "ShopPanel");
         shopPanel.SetActive(false);
         CreatePlaceholderLabel(shopPanel.transform, "SHOP", "Coming Soon", font);
+
+        // --- Inventory / Loadout Overlay (Tab key, renders on top) ---
+        var inventoryOverlay = BuildInventoryOverlay(root.transform, font, slotPrefab, weaponBtnPrefab);
 
         // =========== WIRE MainMenuUI COMPONENT ===========
         var menuUI = root.AddComponent<MainMenuUI>();
@@ -766,22 +769,22 @@ public static class MainMenuSceneSetup
         menuSo.FindProperty("_selectedBiomePreview").objectReferenceValue    = previewImg;
         menuSo.FindProperty("_launchButton").objectReferenceValue            = launchBtn.GetComponent<Button>();
 
-        // Exile tab — HideoutUI.
-        menuSo.FindProperty("_hideoutUI").objectReferenceValue = exileContent;
+        // Exile tab — character info + inventory overlay.
+        menuSo.FindProperty("_exileTabUI").objectReferenceValue = exileContent;
+        menuSo.FindProperty("_inventoryOverlay").objectReferenceValue = inventoryOverlay;
 
         menuSo.ApplyModifiedPropertiesWithoutUndo();
     }
 
     // =====================================================================
-    // Exile Panel (stash + loadout + stats)
+    // Exile Panel (character info)
     // =====================================================================
 
     /// <summary>
-    /// Builds the Exile tab content — a simplified version of the old HideoutUI
-    /// showing stash, weapon loadout, and stats. Returns the HideoutUI component.
+    /// Builds the Exile tab content — character name, level, title, stats,
+    /// and a hint to press Tab for the inventory overlay. Returns the ExileTabUI component.
     /// </summary>
-    private static HideoutUI BuildExilePanel(Transform parent, TMP_FontAsset font,
-        GameObject slotPrefab, GameObject weaponBtnPrefab)
+    private static ExileTabUI BuildExilePanel(Transform parent, TMP_FontAsset font)
     {
         var container = CreatePanel(parent, "ExileContent");
         StretchFull(container);
@@ -793,83 +796,462 @@ public static class MainMenuSceneSetup
             "YOUR EXILE", 28, TextAlignmentOptions.Center,
             new Color(0.90f, 0.85f, 0.70f, 1f));
 
-        // Stats.
-        var statsText = CreateText(container.transform, "Stats", font,
+        // Character name.
+        var nameText = CreateText(container.transform, "CharacterName", font,
             new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-            new Vector2(0, -60), new Vector2(800, 25),
-            "Runs: 0  |  Extractions: 0  |  Kills: 0  |  Time: 0m",
-            16, TextAlignmentOptions.Center,
-            new Color(0.55f, 0.55f, 0.55f, 0.9f));
+            new Vector2(0, -70), new Vector2(400, 30),
+            "Exile", 24, TextAlignmentOptions.Center,
+            Color.white);
 
-        // Stash title.
-        var stashTitle = CreateText(container.transform, "StashTitle", font,
+        // Level.
+        var levelText = CreateText(container.transform, "Level", font,
             new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-            new Vector2(0, -95), new Vector2(300, 25),
-            "STASH (0)", 18, TextAlignmentOptions.Center,
+            new Vector2(0, -100), new Vector2(300, 25),
+            "Level 1", 18, TextAlignmentOptions.Center,
             new Color(0.75f, 0.70f, 0.60f, 1f));
 
-        // Stash grid.
-        var stashContainer = CreatePanel(container.transform, "StashContainer");
-        var stashRect = stashContainer.GetComponent<RectTransform>();
-        stashRect.anchorMin = new Vector2(0.1f, 0.30f);
-        stashRect.anchorMax = new Vector2(0.9f, 0.83f);
-        stashRect.offsetMin = Vector2.zero;
-        stashRect.offsetMax = Vector2.zero;
-        var stashBg = stashContainer.AddComponent<Image>();
-        stashBg.color = new Color(0.06f, 0.06f, 0.09f, 0.8f);
+        // Title / rank.
+        var titleText = CreateText(container.transform, "Title", font,
+            new Vector2(0.5f, 1), new Vector2(0.5f, 1),
+            new Vector2(0, -125), new Vector2(300, 22),
+            "Survivor", 16, TextAlignmentOptions.Center,
+            new Color(0.60f, 0.55f, 0.45f, 0.9f));
+
+        // Lifetime stats.
+        var statsText = CreateText(container.transform, "Stats", font,
+            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+            Vector2.zero, new Vector2(400, 200),
+            "Runs: 0\nExtractions: 0\nKills: 0\nTime Survived: 0m\nCurrency: 0",
+            16, TextAlignmentOptions.Center,
+            new Color(0.55f, 0.55f, 0.55f, 0.9f));
+        var statsTmp = statsText.GetComponent<TextMeshProUGUI>();
+        statsTmp.enableWordWrapping = true;
+
+        // Hint to open inventory.
+        var hintText = CreateText(container.transform, "InventoryHint", font,
+            new Vector2(0.5f, 0), new Vector2(0.5f, 0),
+            new Vector2(0, 40), new Vector2(500, 30),
+            "Press [Tab] to manage stash & loadout", 16, TextAlignmentOptions.Center,
+            new Color(0.65f, 0.60f, 0.45f, 0.8f));
+
+        // Wire ExileTabUI component.
+        var exileTab = container.AddComponent<ExileTabUI>();
+        var so = new SerializedObject(exileTab);
+        so.FindProperty("_nameText").objectReferenceValue          = nameText.GetComponent<TMP_Text>();
+        so.FindProperty("_levelText").objectReferenceValue         = levelText.GetComponent<TMP_Text>();
+        so.FindProperty("_titleText").objectReferenceValue         = titleText.GetComponent<TMP_Text>();
+        so.FindProperty("_statsText").objectReferenceValue         = statsText.GetComponent<TMP_Text>();
+        so.FindProperty("_inventoryHintText").objectReferenceValue = hintText.GetComponent<TMP_Text>();
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        return exileTab;
+    }
+
+    // =====================================================================
+    // Inventory / Loadout Overlay (Tab key) — Tarkov-style split layout
+    // =====================================================================
+
+    /// <summary>
+    /// Builds the full-screen inventory overlay with stash grid on the left
+    /// and equipment slots + backpack on the right. Starts hidden (alpha 0).
+    /// Returns the MainMenuInventoryUI component.
+    /// </summary>
+    private static MainMenuInventoryUI BuildInventoryOverlay(Transform canvasRoot,
+        TMP_FontAsset font, GameObject slotPrefab, GameObject weaponBtnPrefab)
+    {
+        // Root overlay — full screen, on top of all panels.
+        var overlay = CreatePanel(canvasRoot, "InventoryOverlay");
+        StretchFull(overlay);
+
+        // Dark backdrop.
+        var backdrop = new GameObject("Backdrop");
+        backdrop.transform.SetParent(overlay.transform, false);
+        backdrop.layer = 5;
+        var bdImg = backdrop.AddComponent<Image>();
+        bdImg.color = new Color(0f, 0f, 0f, 0.7f);
+        bdImg.raycastTarget = true;
+        StretchFull(backdrop);
+
+        // CanvasGroup for show/hide.
+        var canvasGroup = overlay.AddComponent<CanvasGroup>();
+        canvasGroup.alpha = 0f;
+        canvasGroup.blocksRaycasts = false;
+        canvasGroup.interactable = false;
+
+        // Center container.
+        var center = CreatePanel(overlay.transform, "Center");
+        var centerRect = center.GetComponent<RectTransform>();
+        centerRect.anchorMin = new Vector2(0.05f, 0.03f);
+        centerRect.anchorMax = new Vector2(0.95f, 0.97f);
+        centerRect.offsetMin = Vector2.zero;
+        centerRect.offsetMax = Vector2.zero;
+
+        // ==================== LEFT PANEL — STASH ====================
+        var leftPanel = CreatePanel(center.transform, "LeftPanel");
+        var leftRect = leftPanel.GetComponent<RectTransform>();
+        leftRect.anchorMin = new Vector2(0, 0);
+        leftRect.anchorMax = new Vector2(0.55f, 1);
+        leftRect.offsetMin = Vector2.zero;
+        leftRect.offsetMax = Vector2.zero;
+        var leftBg = leftPanel.AddComponent<Image>();
+        leftBg.color = new Color(0.07f, 0.07f, 0.10f, 0.95f);
+        leftBg.raycastTarget = false;
+
+        // Stash title.
+        var stashTitle = CreateText(leftPanel.transform, "StashTitle", font,
+            new Vector2(0.5f, 1), new Vector2(0.5f, 1),
+            new Vector2(0, -15), new Vector2(300, 28),
+            "STASH (0)", 20, TextAlignmentOptions.Center,
+            new Color(0.85f, 0.80f, 0.65f, 1f));
+
+        // Stash grid area.
+        var stashArea = CreatePanel(leftPanel.transform, "StashArea");
+        var stashAreaRect = stashArea.GetComponent<RectTransform>();
+        stashAreaRect.anchorMin = new Vector2(0.02f, 0.06f);
+        stashAreaRect.anchorMax = new Vector2(0.98f, 0.92f);
+        stashAreaRect.offsetMin = Vector2.zero;
+        stashAreaRect.offsetMax = Vector2.zero;
+        var stashBg = stashArea.AddComponent<Image>();
+        stashBg.color = new Color(0.05f, 0.05f, 0.08f, 0.8f);
         stashBg.raycastTarget = false;
 
-        var slotGrid = CreatePanel(stashContainer.transform, "SlotGrid");
+        var slotGrid = CreatePanel(stashArea.transform, "SlotGrid");
         var slotGridRect = slotGrid.GetComponent<RectTransform>();
         slotGridRect.anchorMin = Vector2.zero;
         slotGridRect.anchorMax = Vector2.one;
-        slotGridRect.offsetMin = new Vector2(15, 15);
-        slotGridRect.offsetMax = new Vector2(-15, -15);
+        slotGridRect.offsetMin = new Vector2(10, 10);
+        slotGridRect.offsetMax = new Vector2(-10, -10);
         var grid = slotGrid.AddComponent<GridLayoutGroup>();
-        grid.cellSize = new Vector2(70, 70);
-        grid.spacing = new Vector2(8, 8);
+        grid.cellSize = new Vector2(65, 65);
+        grid.spacing = new Vector2(6, 6);
         grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
         grid.startAxis = GridLayoutGroup.Axis.Horizontal;
         grid.childAlignment = TextAnchor.UpperLeft;
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = 8;
+        grid.constraintCount = 7;
+
+        // Stash info text.
+        var stashInfoText = CreateText(leftPanel.transform, "StashInfo", font,
+            new Vector2(0.5f, 0), new Vector2(0.5f, 0),
+            new Vector2(0, 15), new Vector2(400, 22),
+            "Items: 0  |  Value: 0g", 13, TextAlignmentOptions.Center,
+            new Color(0.50f, 0.50f, 0.50f, 0.8f));
+
+        // ==================== RIGHT PANEL — LOADOUT ====================
+        var rightPanel = CreatePanel(center.transform, "RightPanel");
+        var rightRect = rightPanel.GetComponent<RectTransform>();
+        rightRect.anchorMin = new Vector2(0.57f, 0);
+        rightRect.anchorMax = new Vector2(1, 1);
+        rightRect.offsetMin = Vector2.zero;
+        rightRect.offsetMax = Vector2.zero;
+        var rightBg = rightPanel.AddComponent<Image>();
+        rightBg.color = new Color(0.07f, 0.07f, 0.10f, 0.95f);
+        rightBg.raycastTarget = false;
 
         // Loadout title.
-        CreateText(container.transform, "LoadoutTitle", font,
-            new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-            new Vector2(0, 205), new Vector2(300, 25),
-            "LOADOUT", 18, TextAlignmentOptions.Center,
+        CreateText(rightPanel.transform, "LoadoutTitle", font,
+            new Vector2(0.5f, 1), new Vector2(0.5f, 1),
+            new Vector2(0, -15), new Vector2(300, 28),
+            "LOADOUT", 20, TextAlignmentOptions.Center,
+            new Color(0.85f, 0.80f, 0.65f, 1f));
+
+        // --- Equipment slots (vertical layout in upper-right) ---
+        var equipArea = CreatePanel(rightPanel.transform, "EquipmentArea");
+        var equipRect = equipArea.GetComponent<RectTransform>();
+        equipRect.anchorMin = new Vector2(0.05f, 0.48f);
+        equipRect.anchorMax = new Vector2(0.95f, 0.92f);
+        equipRect.offsetMin = Vector2.zero;
+        equipRect.offsetMax = Vector2.zero;
+        var equipLayout = equipArea.AddComponent<VerticalLayoutGroup>();
+        equipLayout.spacing = 6;
+        equipLayout.childAlignment = TextAnchor.UpperCenter;
+        equipLayout.childForceExpandWidth = true;
+        equipLayout.childForceExpandHeight = false;
+        equipLayout.padding = new RectOffset(5, 5, 5, 5);
+
+        // Create 5 equipment slots.
+        var headSlot     = BuildEquipmentSlot(equipArea.transform, font, EverRealm.Exiles.Data.EquipSlot.Head);
+        var chestSlot    = BuildEquipmentSlot(equipArea.transform, font, EverRealm.Exiles.Data.EquipSlot.Chest);
+        var legsSlot     = BuildEquipmentSlot(equipArea.transform, font, EverRealm.Exiles.Data.EquipSlot.Legs);
+        var primarySlot  = BuildEquipmentSlot(equipArea.transform, font, EverRealm.Exiles.Data.EquipSlot.PrimaryWeapon);
+        var secondarySlot = BuildEquipmentSlot(equipArea.transform, font, EverRealm.Exiles.Data.EquipSlot.SecondaryWeapon);
+
+        // --- Backpack section (lower-right) ---
+        var backpackTitle = CreateText(rightPanel.transform, "BackpackTitle", font,
+            new Vector2(0.5f, 0.48f), new Vector2(0.5f, 0.48f),
+            new Vector2(0, -10), new Vector2(300, 22),
+            "BACKPACK (0/12)", 16, TextAlignmentOptions.Center,
             new Color(0.75f, 0.70f, 0.60f, 1f));
 
-        // Weapon row.
-        var weaponRow = CreatePanel(container.transform, "WeaponRow");
-        var weaponRowRect = weaponRow.GetComponent<RectTransform>();
-        weaponRowRect.anchorMin = new Vector2(0.5f, 0);
-        weaponRowRect.anchorMax = new Vector2(0.5f, 0);
-        weaponRowRect.pivot = new Vector2(0.5f, 0);
-        weaponRowRect.anchoredPosition = new Vector2(0, 140);
-        weaponRowRect.sizeDelta = new Vector2(800, 55);
-        var hLayout = weaponRow.AddComponent<HorizontalLayoutGroup>();
-        hLayout.spacing = 12;
-        hLayout.childAlignment = TextAnchor.MiddleCenter;
-        hLayout.childForceExpandWidth = false;
-        hLayout.childForceExpandHeight = false;
+        var backpackArea = CreatePanel(rightPanel.transform, "BackpackArea");
+        var backpackAreaRect = backpackArea.GetComponent<RectTransform>();
+        backpackAreaRect.anchorMin = new Vector2(0.05f, 0.10f);
+        backpackAreaRect.anchorMax = new Vector2(0.95f, 0.44f);
+        backpackAreaRect.offsetMin = Vector2.zero;
+        backpackAreaRect.offsetMax = Vector2.zero;
+        var backpackBg = backpackArea.AddComponent<Image>();
+        backpackBg.color = new Color(0.05f, 0.05f, 0.08f, 0.8f);
+        backpackBg.raycastTarget = false;
 
-        // Wire HideoutUI component (no Solo/Multiplayer buttons — launch is in Play tab).
-        var hideout = container.AddComponent<HideoutUI>();
-        var so = new SerializedObject(hideout);
-        so.FindProperty("_stashSlotContainer").objectReferenceValue = slotGridRect;
+        var backpackGrid = CreatePanel(backpackArea.transform, "BackpackGrid");
+        var backpackGridRect = backpackGrid.GetComponent<RectTransform>();
+        backpackGridRect.anchorMin = Vector2.zero;
+        backpackGridRect.anchorMax = Vector2.one;
+        backpackGridRect.offsetMin = new Vector2(10, 10);
+        backpackGridRect.offsetMax = new Vector2(-10, -10);
+        var bpGrid = backpackGrid.AddComponent<GridLayoutGroup>();
+        bpGrid.cellSize = new Vector2(65, 65);
+        bpGrid.spacing = new Vector2(6, 6);
+        bpGrid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+        bpGrid.startAxis = GridLayoutGroup.Axis.Horizontal;
+        bpGrid.childAlignment = TextAnchor.UpperLeft;
+        bpGrid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        bpGrid.constraintCount = 4;
+
+        // Loadout info text.
+        var loadoutInfoText = CreateText(rightPanel.transform, "LoadoutInfo", font,
+            new Vector2(0.5f, 0), new Vector2(0.5f, 0),
+            new Vector2(0, 15), new Vector2(400, 22),
+            "Defense: 0  |  Backpack: 0/12", 13, TextAlignmentOptions.Center,
+            new Color(0.50f, 0.50f, 0.50f, 0.8f));
+
+        // ==================== CLOSE HINT ====================
+        CreateText(center.transform, "CloseHint", font,
+            new Vector2(0.5f, 0), new Vector2(0.5f, 0),
+            new Vector2(0, -15), new Vector2(400, 22),
+            "Press [Tab] to close", 13, TextAlignmentOptions.Center,
+            new Color(0.45f, 0.45f, 0.45f, 0.6f));
+
+        // ==================== TOOLTIP ====================
+        var tooltipGo = CreatePanel(overlay.transform, "Tooltip");
+        var tooltipRect = tooltipGo.GetComponent<RectTransform>();
+        tooltipRect.sizeDelta = new Vector2(260, 210);
+        tooltipRect.pivot = new Vector2(0, 1);
+        var tooltipBg = tooltipGo.AddComponent<Image>();
+        tooltipBg.color = new Color(0.05f, 0.05f, 0.08f, 0.95f);
+        tooltipBg.raycastTarget = false;
+
+        var tooltipCg = tooltipGo.AddComponent<CanvasGroup>();
+        tooltipCg.alpha = 0f;
+        tooltipCg.blocksRaycasts = false;
+        tooltipCg.interactable = false;
+
+        var ttName = CreateText(tooltipGo.transform, "Name", font,
+            new Vector2(0, 1), new Vector2(1, 1), Vector2.zero, Vector2.zero,
+            "Item Name", 18, TextAlignmentOptions.Left, Color.white);
+        var ttNameRect = ttName.GetComponent<RectTransform>();
+        ttNameRect.anchorMin = new Vector2(0, 1);
+        ttNameRect.anchorMax = new Vector2(1, 1);
+        ttNameRect.pivot = new Vector2(0, 1);
+        ttNameRect.offsetMin = new Vector2(10, -30);
+        ttNameRect.offsetMax = new Vector2(-10, -8);
+
+        var ttRarity = CreateText(tooltipGo.transform, "Rarity", font,
+            new Vector2(0, 1), new Vector2(1, 1), Vector2.zero, Vector2.zero,
+            "Common", 13, TextAlignmentOptions.Left, new Color(0.6f, 0.6f, 0.6f));
+        var ttRarityRect = ttRarity.GetComponent<RectTransform>();
+        ttRarityRect.anchorMin = new Vector2(0, 1);
+        ttRarityRect.anchorMax = new Vector2(1, 1);
+        ttRarityRect.pivot = new Vector2(0, 1);
+        ttRarityRect.offsetMin = new Vector2(10, -50);
+        ttRarityRect.offsetMax = new Vector2(-10, -32);
+
+        var ttType = CreateText(tooltipGo.transform, "Type", font,
+            new Vector2(0, 1), new Vector2(1, 1), Vector2.zero, Vector2.zero,
+            "Type", 13, TextAlignmentOptions.Right, new Color(0.5f, 0.5f, 0.5f));
+        var ttTypeRect = ttType.GetComponent<RectTransform>();
+        ttTypeRect.anchorMin = new Vector2(0, 1);
+        ttTypeRect.anchorMax = new Vector2(1, 1);
+        ttTypeRect.pivot = new Vector2(0, 1);
+        ttTypeRect.offsetMin = new Vector2(10, -50);
+        ttTypeRect.offsetMax = new Vector2(-10, -32);
+
+        var ttDesc = CreateText(tooltipGo.transform, "Description", font,
+            new Vector2(0, 0), new Vector2(1, 1), Vector2.zero, Vector2.zero,
+            "", 13, TextAlignmentOptions.TopLeft, new Color(0.7f, 0.7f, 0.7f));
+        var ttDescTmp = ttDesc.GetComponent<TextMeshProUGUI>();
+        ttDescTmp.enableWordWrapping = true;
+        var ttDescRect = ttDesc.GetComponent<RectTransform>();
+        ttDescRect.anchorMin = new Vector2(0, 0);
+        ttDescRect.anchorMax = new Vector2(1, 1);
+        ttDescRect.offsetMin = new Vector2(10, 60);
+        ttDescRect.offsetMax = new Vector2(-10, -55);
+
+        // Equipment tooltip fields.
+        var ttEquipSlot = CreateText(tooltipGo.transform, "EquipSlot", font,
+            new Vector2(0, 0), new Vector2(1, 0), Vector2.zero, Vector2.zero,
+            "", 13, TextAlignmentOptions.Left, new Color(0.3f, 0.8f, 1f));
+        var ttEquipSlotRect = ttEquipSlot.GetComponent<RectTransform>();
+        ttEquipSlotRect.anchorMin = new Vector2(0, 0);
+        ttEquipSlotRect.anchorMax = new Vector2(1, 0);
+        ttEquipSlotRect.pivot = new Vector2(0, 0);
+        ttEquipSlotRect.offsetMin = new Vector2(10, 38);
+        ttEquipSlotRect.offsetMax = new Vector2(-10, 55);
+
+        var ttDefense = CreateText(tooltipGo.transform, "Defense", font,
+            new Vector2(0, 0), new Vector2(1, 0), Vector2.zero, Vector2.zero,
+            "", 13, TextAlignmentOptions.Right, new Color(0.4f, 0.9f, 0.4f));
+        var ttDefenseRect = ttDefense.GetComponent<RectTransform>();
+        ttDefenseRect.anchorMin = new Vector2(0, 0);
+        ttDefenseRect.anchorMax = new Vector2(1, 0);
+        ttDefenseRect.pivot = new Vector2(1, 0);
+        ttDefenseRect.offsetMin = new Vector2(10, 38);
+        ttDefenseRect.offsetMax = new Vector2(-10, 55);
+
+        var ttValue = CreateText(tooltipGo.transform, "Value", font,
+            new Vector2(0, 0), new Vector2(0.5f, 0), Vector2.zero, Vector2.zero,
+            "Value: 0g", 13, TextAlignmentOptions.Left, new Color(0.8f, 0.75f, 0.4f));
+        var ttValueRect = ttValue.GetComponent<RectTransform>();
+        ttValueRect.anchorMin = new Vector2(0, 0);
+        ttValueRect.anchorMax = new Vector2(0.5f, 0);
+        ttValueRect.pivot = new Vector2(0, 0);
+        ttValueRect.offsetMin = new Vector2(10, 10);
+        ttValueRect.offsetMax = new Vector2(-5, 32);
+
+        var ttWeight = CreateText(tooltipGo.transform, "Weight", font,
+            new Vector2(0.5f, 0), new Vector2(1, 0), Vector2.zero, Vector2.zero,
+            "Weight: 0.0", 13, TextAlignmentOptions.Right, new Color(0.6f, 0.6f, 0.6f));
+        var ttWeightRect = ttWeight.GetComponent<RectTransform>();
+        ttWeightRect.anchorMin = new Vector2(0.5f, 0);
+        ttWeightRect.anchorMax = new Vector2(1, 0);
+        ttWeightRect.pivot = new Vector2(1, 0);
+        ttWeightRect.offsetMin = new Vector2(5, 10);
+        ttWeightRect.offsetMax = new Vector2(-10, 32);
+
+        // Wire ItemTooltipUI.
+        var tooltip = tooltipGo.AddComponent<ItemTooltipUI>();
+        var ttSo = new SerializedObject(tooltip);
+        ttSo.FindProperty("_canvasGroup").objectReferenceValue      = tooltipCg;
+        ttSo.FindProperty("_panelRect").objectReferenceValue        = tooltipRect;
+        ttSo.FindProperty("_nameText").objectReferenceValue         = ttName.GetComponent<TMP_Text>();
+        ttSo.FindProperty("_rarityText").objectReferenceValue       = ttRarity.GetComponent<TMP_Text>();
+        ttSo.FindProperty("_typeText").objectReferenceValue         = ttType.GetComponent<TMP_Text>();
+        ttSo.FindProperty("_descriptionText").objectReferenceValue  = ttDesc.GetComponent<TMP_Text>();
+        ttSo.FindProperty("_valueText").objectReferenceValue        = ttValue.GetComponent<TMP_Text>();
+        ttSo.FindProperty("_weightText").objectReferenceValue       = ttWeight.GetComponent<TMP_Text>();
+        ttSo.FindProperty("_defenseText").objectReferenceValue      = ttDefense.GetComponent<TMP_Text>();
+        ttSo.FindProperty("_equipSlotText").objectReferenceValue    = ttEquipSlot.GetComponent<TMP_Text>();
+        ttSo.ApplyModifiedPropertiesWithoutUndo();
+
+        // ==================== WIRE MainMenuInventoryUI ====================
+        var inventoryUI = overlay.AddComponent<MainMenuInventoryUI>();
+        var invSo = new SerializedObject(inventoryUI);
+
+        invSo.FindProperty("_canvasGroup").objectReferenceValue          = canvasGroup;
+        invSo.FindProperty("_stashSlotContainer").objectReferenceValue   = slotGridRect;
         if (slotPrefab != null)
-            so.FindProperty("_stashSlotPrefab").objectReferenceValue = slotPrefab;
-        so.FindProperty("_stashTitle").objectReferenceValue         = stashTitle.GetComponent<TMP_Text>();
-        so.FindProperty("_weaponListContainer").objectReferenceValue = weaponRowRect;
-        if (weaponBtnPrefab != null)
-            so.FindProperty("_weaponButtonPrefab").objectReferenceValue = weaponBtnPrefab;
-        so.FindProperty("_statsText").objectReferenceValue           = statsText.GetComponent<TMP_Text>();
-        // Solo/Multiplayer buttons left null — handled gracefully by HideoutUI.Show().
+            invSo.FindProperty("_stashSlotPrefab").objectReferenceValue  = slotPrefab;
+        invSo.FindProperty("_stashTitle").objectReferenceValue           = stashTitle.GetComponent<TMP_Text>();
+
+        invSo.FindProperty("_headSlot").objectReferenceValue             = headSlot;
+        invSo.FindProperty("_chestSlot").objectReferenceValue            = chestSlot;
+        invSo.FindProperty("_legsSlot").objectReferenceValue             = legsSlot;
+        invSo.FindProperty("_primaryWeaponSlot").objectReferenceValue    = primarySlot;
+        invSo.FindProperty("_secondaryWeaponSlot").objectReferenceValue  = secondarySlot;
+
+        invSo.FindProperty("_backpackSlotContainer").objectReferenceValue = backpackGridRect;
+        invSo.FindProperty("_backpackTitle").objectReferenceValue        = backpackTitle.GetComponent<TMP_Text>();
+
+        invSo.FindProperty("_stashInfoText").objectReferenceValue        = stashInfoText.GetComponent<TMP_Text>();
+        invSo.FindProperty("_loadoutInfoText").objectReferenceValue      = loadoutInfoText.GetComponent<TMP_Text>();
+        invSo.FindProperty("_tooltip").objectReferenceValue              = tooltip;
+
+        invSo.ApplyModifiedPropertiesWithoutUndo();
+
+        return inventoryUI;
+    }
+
+    /// <summary>
+    /// Builds a single equipment slot (background + icon + label)
+    /// and wires the EquipmentSlotUI component. Returns the component.
+    /// </summary>
+    private static EquipmentSlotUI BuildEquipmentSlot(Transform parent, TMP_FontAsset font,
+        EverRealm.Exiles.Data.EquipSlot slotType)
+    {
+        string slotName = slotType.ToString();
+
+        var go = new GameObject(slotName + "Slot");
+        go.transform.SetParent(parent, false);
+        go.layer = 5;
+
+        var layout = go.AddComponent<LayoutElement>();
+        layout.preferredHeight = 55;
+        layout.flexibleWidth = 1;
+
+        go.GetComponent<RectTransform>().sizeDelta = new Vector2(0, 55);
+
+        // Background.
+        var bg = go.AddComponent<Image>();
+        bg.color = new Color(0.10f, 0.10f, 0.14f, 0.9f);
+        bg.raycastTarget = true;
+
+        // Border.
+        var borderGo = new GameObject("Border");
+        borderGo.transform.SetParent(go.transform, false);
+        borderGo.layer = 5;
+        var borderRect = borderGo.AddComponent<RectTransform>();
+        borderRect.anchorMin = Vector2.zero;
+        borderRect.anchorMax = Vector2.one;
+        borderRect.offsetMin = new Vector2(-2, -2);
+        borderRect.offsetMax = new Vector2(2, 2);
+        var borderImg = borderGo.AddComponent<Image>();
+        borderImg.color = new Color(0.25f, 0.25f, 0.25f, 0.5f);
+        borderImg.raycastTarget = false;
+        borderGo.transform.SetAsFirstSibling();
+
+        // Icon.
+        var iconGo = new GameObject("Icon");
+        iconGo.transform.SetParent(go.transform, false);
+        iconGo.layer = 5;
+        var iconRect = iconGo.AddComponent<RectTransform>();
+        iconRect.anchorMin = new Vector2(0, 0.1f);
+        iconRect.anchorMax = new Vector2(0, 0.9f);
+        iconRect.pivot = new Vector2(0, 0.5f);
+        iconRect.anchoredPosition = new Vector2(10, 0);
+        iconRect.sizeDelta = new Vector2(40, 0);
+        var iconImg = iconGo.AddComponent<Image>();
+        iconImg.preserveAspect = true;
+        iconImg.raycastTarget = false;
+        iconImg.enabled = false;
+
+        // Slot label.
+        string displayName = slotType switch
+        {
+            EverRealm.Exiles.Data.EquipSlot.Head            => "HEAD",
+            EverRealm.Exiles.Data.EquipSlot.Chest           => "CHEST",
+            EverRealm.Exiles.Data.EquipSlot.Legs            => "LEGS",
+            EverRealm.Exiles.Data.EquipSlot.PrimaryWeapon   => "PRIMARY WEAPON",
+            EverRealm.Exiles.Data.EquipSlot.SecondaryWeapon => "SECONDARY WEAPON",
+            _                                                => "SLOT"
+        };
+
+        var labelGo = new GameObject("Label");
+        labelGo.transform.SetParent(go.transform, false);
+        labelGo.layer = 5;
+        var labelRect = labelGo.AddComponent<RectTransform>();
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = new Vector2(60, 5);
+        labelRect.offsetMax = new Vector2(-10, -5);
+        var labelTmp = labelGo.AddComponent<TextMeshProUGUI>();
+        labelTmp.font = font;
+        labelTmp.text = displayName;
+        labelTmp.fontSize = 14;
+        labelTmp.alignment = TextAlignmentOptions.Left;
+        labelTmp.color = new Color(0.4f, 0.4f, 0.4f, 0.6f);
+        labelTmp.raycastTarget = false;
+
+        // Wire EquipmentSlotUI component.
+        var equipSlot = go.AddComponent<EquipmentSlotUI>();
+        var so = new SerializedObject(equipSlot);
+        so.FindProperty("_slotType").enumValueIndex = (int)slotType;
+        so.FindProperty("_icon").objectReferenceValue       = iconImg;
+        so.FindProperty("_border").objectReferenceValue     = borderImg;
+        so.FindProperty("_background").objectReferenceValue = bg;
+        so.FindProperty("_slotLabel").objectReferenceValue  = labelTmp;
         so.ApplyModifiedPropertiesWithoutUndo();
 
-        return hideout;
+        return equipSlot;
     }
 
     // =====================================================================

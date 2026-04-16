@@ -17,9 +17,13 @@ namespace EverRealm.Exiles.Items
         public IReadOnlyList<ItemStack> Slots => _slots;
         public int SlotCount => _slots.Count;
 
-        public Inventory(int initialCapacity = 20)
+        /// <summary>Maximum slot count. 0 = unlimited.</summary>
+        public int MaxSlots { get; }
+
+        public Inventory(int initialCapacity = 20, int maxSlots = 0)
         {
             _slots = new List<ItemStack>(initialCapacity);
+            MaxSlots = maxSlots;
         }
 
         /// <summary>
@@ -53,6 +57,7 @@ namespace EverRealm.Exiles.Items
                 // Create new stacks for the remainder.
                 while (remaining > 0)
                 {
+                    if (MaxSlots > 0 && _slots.Count >= MaxSlots) break;
                     int toAdd = remaining < max ? remaining : max;
                     _slots.Add(new ItemStack(def, toAdd));
                     remaining -= toAdd;
@@ -62,8 +67,11 @@ namespace EverRealm.Exiles.Items
             {
                 // Non-stackable: one item per slot.
                 for (int i = 0; i < count; i++)
+                {
+                    if (MaxSlots > 0 && _slots.Count >= MaxSlots) break;
                     _slots.Add(new ItemStack(def, 1));
-                remaining = 0;
+                    remaining--;
+                }
             }
 
             int added = count - remaining;

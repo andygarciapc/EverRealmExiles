@@ -18,6 +18,14 @@ namespace EverRealm.Exiles.Core
         /// <summary>BiomeId of the biome chosen for the next run.</summary>
         public string SelectedBiomeId = "";
 
+        // ----- Loadout -----
+
+        /// <summary>Equipment slots: maps slot name to item ID.</summary>
+        public List<SavedEquipSlot> EquippedItems = new();
+
+        /// <summary>Items placed in the backpack for the next run.</summary>
+        public List<SavedItemStack> BackpackItems = new();
+
         // ----- Player profile -----
         public string PlayerName = "Exile";
         public int PlayerLevel = 1;
@@ -28,6 +36,25 @@ namespace EverRealm.Exiles.Core
         public int TotalExtractions;
         public int TotalKills;
         public float TotalPlayTime;
+    }
+
+    /// <summary>
+    /// Serialization-friendly equipment slot entry.
+    /// Uses string slot name for resilience against enum reordering.
+    /// </summary>
+    [System.Serializable]
+    public struct SavedEquipSlot
+    {
+        public string SlotName;
+        public string ItemId;
+        public int Count;
+
+        public SavedEquipSlot(string slotName, string itemId, int count)
+        {
+            SlotName = slotName;
+            ItemId = itemId;
+            Count = count;
+        }
     }
 
     /// <summary>

@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 2065813793590651337}
   - component: {fileID: 4488890855722472523}
   - component: {fileID: 9209204850221324757}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: InventorySlot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -63,7 +63,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
   m_Color: {r: 0.25, g: 0.25, b: 0.25, a: 0.5}
-  m_RaycastTarget: 0
+  m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -95,6 +95,10 @@ MonoBehaviour:
   _countText: {fileID: 242684166330531902}
   _border: {fileID: 4488890855722472523}
   _background: {fileID: 4448338890238493440}
+  _emptyBorderColor: {r: 0.25, g: 0.25, b: 0.25, a: 0.5}
+  _emptyBgColor: {r: 0.12, g: 0.12, b: 0.16, a: 0.9}
+  _hoveredBgColor: {r: 0.18, g: 0.18, b: 0.24, a: 0.95}
+  _selectedBorderColor: {r: 0.9, g: 0.85, b: 0.3, a: 1}
 --- !u!1 &3631200543283143596
 GameObject:
   m_ObjectHideFlags: 0
@@ -106,7 +110,7 @@ GameObject:
   - component: {fileID: 2891287254729735959}
   - component: {fileID: 1682238694056040425}
   - component: {fileID: 4448338890238493440}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: Background
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -181,7 +185,7 @@ GameObject:
   - component: {fileID: 7448752283373105689}
   - component: {fileID: 5417674749874118201}
   - component: {fileID: 242684166330531902}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: Count
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -318,7 +322,7 @@ GameObject:
   - component: {fileID: 6657936780882347573}
   - component: {fileID: 1938309006028371576}
   - component: {fileID: 587441594551963035}
-  m_Layer: 0
+  m_Layer: 5
   m_Name: Icon
   m_TagString: Untagged
   m_Icon: {fileID: 0}

@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using EverRealm.Exiles.Data;
 
@@ -14,17 +15,39 @@ namespace EverRealm.Exiles.Items
         /// <summary>The underlying inventory. Use for read access and event subscription.</summary>
         public Inventory Inventory => _inventory;
 
-        /// <summary>Fired after a pickup is successfully added.</summary>
-        public event System.Action<ItemStack> OnPickedUp;
+        /// <summary>Fired after a pickup is successfully added (for HUD notifications).</summary>
+        public event Action<ItemStack> OnPickedUp;
+
+        /// <summary>Fired when inventory contents change for any reason.</summary>
+        public event Action OnInventoryChanged;
 
         private void Awake()
         {
             _inventory = new Inventory();
-            _inventory.OnItemAdded += stack =>
+            _inventory.OnItemAdded += OnItemAdded;
+            _inventory.OnChanged += HandleChanged;
+        }
+
+        private void OnDestroy()
+        {
+            if (_inventory != null)
             {
-                OnPickedUp?.Invoke(stack);
-                Debug.Log($"[Inventory] +{stack.Count} {stack.Definition.DisplayName}");
-            };
+                _inventory.OnItemAdded -= OnItemAdded;
+                _inventory.OnChanged -= HandleChanged;
+            }
+        }
+
+        private void OnItemAdded(ItemStack stack)
+        {
+            OnPickedUp?.Invoke(stack);
+
+            string name = stack.Definition != null ? stack.Definition.DisplayName : "???";
+            Debug.Log($"[Inventory] +{stack.Count} {name}");
+        }
+
+        private void HandleChanged()
+        {
+            OnInventoryChanged?.Invoke();
         }
 
         /// <summary>
@@ -32,6 +55,12 @@ namespace EverRealm.Exiles.Items
         /// </summary>
         public bool TryAdd(ItemDefinition def, int count = 1)
         {
+            if (def == null)
+            {
+                Debug.LogWarning("[PlayerInventory] Attempted to add null item definition.");
+                return false;
+            }
+
             int overflow = _inventory.Add(def, count);
             return overflow == 0;
         }

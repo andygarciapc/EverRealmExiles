@@ -1,57 +1,55 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
-using EverRealm.Exiles.Items;
+using EverRealm.Exiles.Data;
 
 namespace EverRealm.Exiles.UI
 {
     /// <summary>
-    /// Displays a single inventory slot: item icon, stack count, rarity-coloured
-    /// border, selected highlight, and hover state for tooltip integration.
-    /// Consumes <see cref="ItemViewData"/> instead of raw <see cref="ItemStack"/>.
+    /// A named equipment slot (Head, Chest, etc.) on the loadout panel.
+    /// Displays the currently equipped item or a placeholder label.
     /// </summary>
-    public sealed class InventorySlotUI : MonoBehaviour,
+    public sealed class EquipmentSlotUI : MonoBehaviour,
         IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
     {
+        [Header("Slot Identity")]
+        [SerializeField] private EquipSlot _slotType;
+
+        [Header("Visuals")]
         [SerializeField] private Image _icon;
-        [SerializeField] private TMP_Text _countText;
         [SerializeField] private Image _border;
         [SerializeField] private Image _background;
+        [SerializeField] private TMP_Text _slotLabel;
 
         [Header("Colours")]
         [SerializeField] private Color _emptyBorderColor = new(0.25f, 0.25f, 0.25f, 0.5f);
-        [SerializeField] private Color _emptyBgColor = new(0.12f, 0.12f, 0.16f, 0.9f);
+        [SerializeField] private Color _emptyBgColor = new(0.10f, 0.10f, 0.14f, 0.9f);
         [SerializeField] private Color _hoveredBgColor = new(0.18f, 0.18f, 0.24f, 0.95f);
-        [SerializeField] private Color _selectedBorderColor = new(0.9f, 0.85f, 0.3f, 1f);
+        [SerializeField] private Color _occupiedBorderColor = new(0.3f, 0.8f, 1f, 0.8f);
 
         private ItemViewData _data;
-        private bool _isSelected;
         private bool _isHovered;
-        private int _slotIndex;
 
-        /// <summary>Current display data bound to this slot.</summary>
+        public EquipSlot SlotType => _slotType;
         public ItemViewData Data => _data;
 
-        /// <summary>Index of this slot within its parent grid.</summary>
-        public int SlotIndex => _slotIndex;
+        /// <summary>Fired when the slot is clicked. Args: (slotType, data).</summary>
+        public event Action<EquipSlot, ItemViewData> OnSlotClicked;
 
-        /// <summary>Fired when this slot is clicked. Args: (slotIndex, data).</summary>
-        public event System.Action<int, ItemViewData> OnSlotClicked;
+        /// <summary>Fired on pointer enter for tooltip display.</summary>
+        public event Action<EquipmentSlotUI> OnSlotHoverEnter;
 
-        /// <summary>Fired when pointer enters this slot.</summary>
-        public event System.Action<InventorySlotUI> OnSlotHoverEnter;
-
-        /// <summary>Fired when pointer exits this slot.</summary>
-        public event System.Action<InventorySlotUI> OnSlotHoverExit;
+        /// <summary>Fired on pointer exit to hide tooltip.</summary>
+        public event Action<EquipmentSlotUI> OnSlotHoverExit;
 
         // -----------------------------------------------------------------
 
-        /// <summary>Populate this slot with presentation data.</summary>
-        public void Populate(ItemViewData data, int slotIndex = 0)
+        /// <summary>Show an equipped item in this slot.</summary>
+        public void Populate(ItemViewData data)
         {
             _data = data;
-            _slotIndex = slotIndex;
 
             if (data.IsEmpty)
             {
@@ -59,7 +57,6 @@ namespace EverRealm.Exiles.UI
                 return;
             }
 
-            // Icon — show fallback tint if definition has no sprite.
             if (_icon != null)
             {
                 if (data.HasIcon)
@@ -76,24 +73,13 @@ namespace EverRealm.Exiles.UI
                 }
             }
 
-            // Stack count.
-            if (_countText != null)
-            {
-                bool show = !string.IsNullOrEmpty(data.CountText);
-                _countText.text = data.CountText;
-                _countText.enabled = show;
-            }
+            if (_slotLabel != null)
+                _slotLabel.enabled = false; // hide label when item is shown
 
             UpdateVisuals();
         }
 
-        /// <summary>Populate from a raw ItemStack (backwards compatibility).</summary>
-        public void Populate(ItemStack stack)
-        {
-            Populate(ItemViewData.FromStack(stack));
-        }
-
-        /// <summary>Show an empty slot.</summary>
+        /// <summary>Show the slot as empty with its type label.</summary>
         public void ShowEmpty()
         {
             _data = ItemViewData.Empty;
@@ -104,16 +90,12 @@ namespace EverRealm.Exiles.UI
                 _icon.enabled = false;
             }
 
-            if (_countText != null)
-                _countText.enabled = false;
+            if (_slotLabel != null)
+            {
+                _slotLabel.text = GetSlotDisplayName(_slotType);
+                _slotLabel.enabled = true;
+            }
 
-            UpdateVisuals();
-        }
-
-        /// <summary>Set the selected state of this slot.</summary>
-        public void SetSelected(bool selected)
-        {
-            _isSelected = selected;
             UpdateVisuals();
         }
 
@@ -123,9 +105,7 @@ namespace EverRealm.Exiles.UI
         {
             if (_border != null)
             {
-                if (_isSelected)
-                    _border.color = _selectedBorderColor;
-                else if (!_data.IsEmpty)
+                if (!_data.IsEmpty)
                     _border.color = _data.RarityColor;
                 else
                     _border.color = _emptyBorderColor;
@@ -136,7 +116,6 @@ namespace EverRealm.Exiles.UI
         }
 
         // -----------------------------------------------------------------
-        // Pointer events
 
         public void OnPointerEnter(PointerEventData eventData)
         {
@@ -156,7 +135,22 @@ namespace EverRealm.Exiles.UI
 
         public void OnPointerClick(PointerEventData eventData)
         {
-            OnSlotClicked?.Invoke(_slotIndex, _data);
+            OnSlotClicked?.Invoke(_slotType, _data);
+        }
+
+        // -----------------------------------------------------------------
+
+        private static string GetSlotDisplayName(EquipSlot slot)
+        {
+            return slot switch
+            {
+                EquipSlot.Head            => "HEAD",
+                EquipSlot.Chest           => "CHEST",
+                EquipSlot.Legs            => "LEGS",
+                EquipSlot.PrimaryWeapon   => "PRIMARY",
+                EquipSlot.SecondaryWeapon => "SECONDARY",
+                _                         => "SLOT"
+            };
         }
     }
 }
