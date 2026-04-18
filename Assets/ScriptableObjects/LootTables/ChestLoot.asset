@@ -33,11 +33,11 @@ MonoBehaviour:
     Weight: 15
     MinCount: 1
     MaxCount: 1
-  - Item: {fileID: 11400000, guid: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6, type: 2}
+  - Item: {fileID: 11400000, guid: b506f5d9e51525c40b95ab267b8773be, type: 2}
     Weight: 5
     MinCount: 1
     MaxCount: 1
-  - Item: {fileID: 11400000, guid: c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8, type: 2}
+  - Item: {fileID: 11400000, guid: 5c89d24028a7f7f49b4e884cc3a22de9, type: 2}
     Weight: 5
     MinCount: 1
     MaxCount: 1

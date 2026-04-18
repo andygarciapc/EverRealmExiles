@@ -27,6 +27,10 @@ namespace EverRealm.Exiles.UI
         [SerializeField] private TMP_Text _defenseText;
         [SerializeField] private TMP_Text _equipSlotText;
 
+        [Header("Weapon (optional)")]
+        [SerializeField] private TMP_Text _damageText;
+        [SerializeField] private TMP_Text _speedText;
+
         [Header("Settings")]
         [SerializeField] private Vector2 _offset = new(12f, -12f);
 
@@ -87,6 +91,18 @@ namespace EverRealm.Exiles.UI
                 bool equippable = data.EquipSlot != EquipSlot.None;
                 _equipSlotText.text = equippable ? $"Slot: {data.EquipSlot}" : "";
                 _equipSlotText.gameObject.SetActive(equippable);
+            }
+
+            if (_damageText != null)
+            {
+                _damageText.text = data.IsWeapon ? $"Damage: {data.WeaponDamage:F0}" : "";
+                _damageText.gameObject.SetActive(data.IsWeapon);
+            }
+
+            if (_speedText != null)
+            {
+                _speedText.text = data.IsWeapon ? $"Speed: {data.WeaponSpeedTier}" : "";
+                _speedText.gameObject.SetActive(data.IsWeapon);
             }
 
             if (_canvasGroup != null)

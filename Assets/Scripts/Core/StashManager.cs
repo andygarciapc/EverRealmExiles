@@ -20,6 +20,9 @@ namespace EverRealm.Exiles.Core
         [SerializeField] private WeaponRegistry _weaponRegistry;
         [SerializeField] private BiomeRegistry _biomeRegistry;
 
+        [Tooltip("Items seeded into the stash for brand-new saves (first launch only).")]
+        [SerializeField] private ItemDefinition[] _starterItems;
+
         private Inventory _stash;
         private Loadout _loadout;
         private SaveData _data;
@@ -52,6 +55,22 @@ namespace EverRealm.Exiles.Core
             _data = SaveManager.Load();
             _stash = new Inventory(100);
             _loadout = new Loadout(12);
+
+            // Seed starter items on first-ever launch.
+            bool isFreshSave = _data.TotalRuns == 0
+                            && _data.StashItems.Count == 0
+                            && _data.EquippedItems.Count == 0;
+
+            if (isFreshSave && _starterItems != null && _starterItems.Length > 0)
+            {
+                foreach (var item in _starterItems)
+                {
+                    if (item == null) continue;
+                    _data.StashItems.Add(new SavedItemStack(item.ItemId, 1));
+                }
+                SaveManager.Save(_data);
+                Debug.Log($"[StashManager] Seeded {_starterItems.Length} starter items for new player.");
+            }
 
             // Rebuild stash inventory from saved item stacks.
             foreach (var saved in _data.StashItems)

@@ -22,7 +22,7 @@ namespace EverRealm.Exiles.Player
     public sealed class PlayerCombat : MonoBehaviour, IDamageable
     {
         [SerializeField] private PlayerStats      _stats;
-        [SerializeField] private WeaponDefinition _weapon;
+        private WeaponDefinition _weapon;
 
         [Header("Health")]
         [SerializeField] private float _maxHealth = 100f;
@@ -40,6 +40,7 @@ namespace EverRealm.Exiles.Player
         public float MaxHealth    => _maxHealth;
         public float Stamina      => _stamina;
         public float MaxStamina   => _stats.MaxStamina;
+        public bool  HasWeapon    => _weapon != null;
 
         /// <summary>Fires when health changes. Args: (current, max).</summary>
         public event Action<float, float> OnHealthChanged;
@@ -62,9 +63,6 @@ namespace EverRealm.Exiles.Player
 
             OnHealthChanged?.Invoke(_health, _maxHealth);
             OnStaminaChanged?.Invoke(_stamina, _stats.MaxStamina);
-
-            if (_weapon != null)
-                _weaponCtrl.Equip(_weapon);
         }
 
         private void Update()
@@ -113,6 +111,7 @@ namespace EverRealm.Exiles.Player
         public void OnAttack(InputValue value)
         {
             if (!value.isPressed) return;
+            if (_weapon == null) return;
             if (_weaponCtrl.IsBusy) return;
 
             float cost = _weapon.LightStamina;
@@ -163,15 +162,18 @@ namespace EverRealm.Exiles.Player
 
         /// <summary>
         /// Set the weapon at runtime (e.g., from loadout selection).
-        /// Falls back to inspector-assigned weapon if null.
+        /// Pass null to unequip — the player will be unarmed.
         /// </summary>
         public void SetWeapon(WeaponDefinition weapon)
         {
-            if (weapon != null)
-                _weapon = weapon;
+            _weapon = weapon;
 
-            if (_weaponCtrl != null && _weapon != null)
+            if (_weaponCtrl == null) return;
+
+            if (_weapon != null)
                 _weaponCtrl.Equip(_weapon);
+            else
+                _weaponCtrl.Unequip();
         }
 
         /// <summary>

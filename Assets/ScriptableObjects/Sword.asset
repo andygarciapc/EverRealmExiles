@@ -27,3 +27,4 @@ MonoBehaviour:
   HitboxHalfExtents: {x: 0.5, y: 0.5, z: 1}
   HitboxForwardOffset: 1.2
   KnockbackForce: 4
+  ModelPrefab: {fileID: 100000, guid: d4a5b6c7e8f9a0b1c2d3e4f5a6b7c8d9, type: 3}

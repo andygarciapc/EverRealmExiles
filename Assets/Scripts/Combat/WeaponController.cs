@@ -15,6 +15,8 @@ namespace EverRealm.Exiles.Combat
     {
         public enum SwingState { Idle, Windup, Active, Recovery }
 
+        [SerializeField] private Transform _weaponMount;
+
         public SwingState State { get; private set; } = SwingState.Idle;
         public bool IsBusy => State != SwingState.Idle;
 
@@ -24,6 +26,7 @@ namespace EverRealm.Exiles.Combat
         private float _currentWindup;
         private float _currentActive;
         private float _currentRecovery;
+        private GameObject _currentModel;
 
         // Track what we've already hit this swing to avoid multi-hits.
         private readonly HashSet<IDamageable> _hitThisSwing = new();
@@ -31,7 +34,43 @@ namespace EverRealm.Exiles.Combat
         // Reusable buffer for Physics.OverlapBoxNonAlloc.
         private readonly Collider[] _overlapBuffer = new Collider[16];
 
-        public void Equip(WeaponDefinition weapon) => _weapon = weapon;
+        public void Equip(WeaponDefinition weapon)
+        {
+            _weapon = weapon;
+            UpdateModel();
+        }
+
+        /// <summary>Clear the equipped weapon. Resets any in-progress swing.</summary>
+        public void Unequip()
+        {
+            _weapon = null;
+            State = SwingState.Idle;
+            _stateTimer = 0f;
+            _hitThisSwing.Clear();
+            UpdateModel();
+        }
+
+        private void UpdateModel()
+        {
+            if (_currentModel != null)
+            {
+                Destroy(_currentModel);
+                _currentModel = null;
+            }
+
+            if (_weapon != null && _weapon.ModelPrefab != null && _weaponMount != null)
+            {
+                _currentModel = Instantiate(_weapon.ModelPrefab, _weaponMount);
+                _currentModel.transform.localPosition = Vector3.zero;
+                _currentModel.transform.localRotation = Quaternion.identity;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_currentModel != null)
+                Destroy(_currentModel);
+        }
 
         /// <summary>Start a light or heavy swing. Returns false if busy or no weapon.</summary>
         public bool StartSwing(bool heavy)

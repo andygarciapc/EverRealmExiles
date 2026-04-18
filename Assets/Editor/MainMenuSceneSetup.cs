@@ -400,6 +400,16 @@ public static class MainMenuSceneSetup
                 so.FindProperty("_weaponRegistry").objectReferenceValue = weaponRegistry;
             if (biomeRegistry != null)
                 so.FindProperty("_biomeRegistry").objectReferenceValue = biomeRegistry;
+
+            // Wire starter items for new players.
+            var swordItem = AssetDatabase.LoadAssetAtPath<ItemDefinition>("Assets/ScriptableObjects/Items/IronSword.asset");
+            var potionItem = AssetDatabase.LoadAssetAtPath<ItemDefinition>("Assets/ScriptableObjects/Items/HealingPotion.asset");
+            var starterProp = so.FindProperty("_starterItems");
+            starterProp.arraySize = 3;
+            starterProp.GetArrayElementAtIndex(0).objectReferenceValue = swordItem;
+            starterProp.GetArrayElementAtIndex(1).objectReferenceValue = potionItem;
+            starterProp.GetArrayElementAtIndex(2).objectReferenceValue = potionItem;
+
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -965,6 +975,8 @@ public static class MainMenuSceneSetup
         var equipLayout = equipArea.AddComponent<VerticalLayoutGroup>();
         equipLayout.spacing = 6;
         equipLayout.childAlignment = TextAnchor.UpperCenter;
+        equipLayout.childControlWidth = true;
+        equipLayout.childControlHeight = true;
         equipLayout.childForceExpandWidth = true;
         equipLayout.childForceExpandHeight = false;
         equipLayout.padding = new RectOffset(5, 5, 5, 5);
@@ -1025,7 +1037,7 @@ public static class MainMenuSceneSetup
         // ==================== TOOLTIP ====================
         var tooltipGo = CreatePanel(overlay.transform, "Tooltip");
         var tooltipRect = tooltipGo.GetComponent<RectTransform>();
-        tooltipRect.sizeDelta = new Vector2(260, 210);
+        tooltipRect.sizeDelta = new Vector2(260, 230);
         tooltipRect.pivot = new Vector2(0, 1);
         var tooltipBg = tooltipGo.AddComponent<Image>();
         tooltipBg.color = new Color(0.05f, 0.05f, 0.08f, 0.95f);
@@ -1098,6 +1110,27 @@ public static class MainMenuSceneSetup
         ttDefenseRect.offsetMin = new Vector2(10, 38);
         ttDefenseRect.offsetMax = new Vector2(-10, 55);
 
+        // Weapon stats — damage (left) and speed (right), same row.
+        var ttDamage = CreateText(tooltipGo.transform, "Damage", font,
+            new Vector2(0, 0), new Vector2(0.5f, 0), Vector2.zero, Vector2.zero,
+            "", 13, TextAlignmentOptions.Left, new Color(1f, 0.6f, 0.3f));
+        var ttDamageRect = ttDamage.GetComponent<RectTransform>();
+        ttDamageRect.anchorMin = new Vector2(0, 0);
+        ttDamageRect.anchorMax = new Vector2(0.5f, 0);
+        ttDamageRect.pivot = new Vector2(0, 0);
+        ttDamageRect.offsetMin = new Vector2(10, 58);
+        ttDamageRect.offsetMax = new Vector2(-5, 75);
+
+        var ttSpeed = CreateText(tooltipGo.transform, "Speed", font,
+            new Vector2(0.5f, 0), new Vector2(1, 0), Vector2.zero, Vector2.zero,
+            "", 13, TextAlignmentOptions.Right, new Color(0.6f, 0.8f, 1f));
+        var ttSpeedRect = ttSpeed.GetComponent<RectTransform>();
+        ttSpeedRect.anchorMin = new Vector2(0.5f, 0);
+        ttSpeedRect.anchorMax = new Vector2(1, 0);
+        ttSpeedRect.pivot = new Vector2(1, 0);
+        ttSpeedRect.offsetMin = new Vector2(5, 58);
+        ttSpeedRect.offsetMax = new Vector2(-10, 75);
+
         var ttValue = CreateText(tooltipGo.transform, "Value", font,
             new Vector2(0, 0), new Vector2(0.5f, 0), Vector2.zero, Vector2.zero,
             "Value: 0g", 13, TextAlignmentOptions.Left, new Color(0.8f, 0.75f, 0.4f));
@@ -1131,6 +1164,8 @@ public static class MainMenuSceneSetup
         ttSo.FindProperty("_weightText").objectReferenceValue       = ttWeight.GetComponent<TMP_Text>();
         ttSo.FindProperty("_defenseText").objectReferenceValue      = ttDefense.GetComponent<TMP_Text>();
         ttSo.FindProperty("_equipSlotText").objectReferenceValue    = ttEquipSlot.GetComponent<TMP_Text>();
+        ttSo.FindProperty("_damageText").objectReferenceValue       = ttDamage.GetComponent<TMP_Text>();
+        ttSo.FindProperty("_speedText").objectReferenceValue        = ttSpeed.GetComponent<TMP_Text>();
         ttSo.ApplyModifiedPropertiesWithoutUndo();
 
         // ==================== WIRE MainMenuInventoryUI ====================

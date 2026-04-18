@@ -63,8 +63,10 @@ namespace EverRealm.Exiles.Core
                     var combat = player.GetComponent<PlayerCombat>();
                     if (combat != null)
                     {
-                        if (weapon != null)
-                            combat.SetWeapon(weapon);
+                        combat.SetWeapon(weapon);
+
+                        if (weapon == null)
+                            Debug.LogWarning("[RunManager] No weapon equipped — player will be unarmed this run.");
 
                         // Apply armor defense from equipped gear.
                         combat.SetArmorDefense(stash.Loadout.TotalDefense);

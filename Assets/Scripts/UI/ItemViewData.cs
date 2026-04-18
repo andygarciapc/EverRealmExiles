@@ -29,11 +29,16 @@ namespace EverRealm.Exiles.UI
         public readonly EquipSlot EquipSlot;
         public readonly float DefenseValue;
         public readonly bool IsEquippable;
+        public readonly bool IsWeapon;
+        public readonly float WeaponDamage;
+        public readonly float WeaponHeavyDamage;
+        public readonly string WeaponSpeedTier;
 
         private ItemViewData(bool isEmpty, string displayName, Sprite icon, int count,
             ItemRarity rarity, ItemType type, string description,
             int value, float weight, string itemId,
-            EquipSlot equipSlot, float defenseValue)
+            EquipSlot equipSlot, float defenseValue,
+            bool isWeapon, float weaponDamage, float weaponHeavyDamage, string weaponSpeedTier)
         {
             IsEmpty = isEmpty;
             HasIcon = icon != null;
@@ -53,6 +58,10 @@ namespace EverRealm.Exiles.UI
             EquipSlot = equipSlot;
             DefenseValue = defenseValue;
             IsEquippable = equipSlot != EquipSlot.None;
+            IsWeapon = isWeapon;
+            WeaponDamage = weaponDamage;
+            WeaponHeavyDamage = weaponHeavyDamage;
+            WeaponSpeedTier = weaponSpeedTier ?? "";
         }
 
         /// <summary>Create view data from an ItemStack. Null-safe.</summary>
@@ -62,6 +71,11 @@ namespace EverRealm.Exiles.UI
                 return Invalid;
 
             var def = stack.Definition;
+            bool isWeapon = def.LinkedWeapon != null;
+            float lightDmg = isWeapon ? def.LinkedWeapon.LightDamage : 0f;
+            float heavyDmg = isWeapon ? def.LinkedWeapon.HeavyDamage : 0f;
+            string speedTier = isWeapon ? ComputeSpeedTier(def.LinkedWeapon) : "";
+
             return new ItemViewData(
                 false,
                 def.DisplayName,
@@ -74,7 +88,11 @@ namespace EverRealm.Exiles.UI
                 def.Weight,
                 def.ItemId,
                 def.EquipSlot,
-                def.DefenseValue
+                def.DefenseValue,
+                isWeapon,
+                lightDmg,
+                heavyDmg,
+                speedTier
             );
         }
 
@@ -83,7 +101,8 @@ namespace EverRealm.Exiles.UI
             true, "", null, 0,
             ItemRarity.Common, ItemType.Misc, "",
             0, 0f, "",
-            EquipSlot.None, 0f
+            EquipSlot.None, 0f,
+            false, 0f, 0f, ""
         );
 
         /// <summary>Fallback for missing or invalid item data.</summary>
@@ -91,8 +110,18 @@ namespace EverRealm.Exiles.UI
             false, "???", null, 1,
             ItemRarity.Common, ItemType.Misc, "Missing item data",
             0, 0f, "invalid",
-            EquipSlot.None, 0f
+            EquipSlot.None, 0f,
+            false, 0f, 0f, ""
         );
+
+        /// <summary>Compute a qualitative speed tier from light attack timing.</summary>
+        private static string ComputeSpeedTier(Data.WeaponDefinition w)
+        {
+            float total = w.LightWindup + w.LightActive + w.LightRecovery;
+            if (total <= 0.4f) return "Fast";
+            if (total <= 0.7f) return "Medium";
+            return "Slow";
+        }
 
         /// <summary>Canonical rarity → colour mapping used by all UI.</summary>
         public static Color GetRarityColor(ItemRarity rarity)

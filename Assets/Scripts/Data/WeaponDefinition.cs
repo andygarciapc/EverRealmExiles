@@ -46,5 +46,9 @@ namespace EverRealm.Exiles.Data
 
         [Header("Knockback")]
         public float KnockbackForce  = 4f;
+
+        [Header("Visuals")]
+        [Tooltip("Prefab instantiated as the weapon model when equipped. Null = invisible weapon.")]
+        public GameObject ModelPrefab;
     }
 }
