@@ -137,15 +137,7 @@ public static class Phase12PrefabGenerator
 
         var prefabRoot = PrefabUtility.LoadPrefabContents(path);
 
-        // Remove existing tooltip if present (idempotency).
-        var existingTooltip = prefabRoot.transform.Find("ItemTooltip");
-        if (existingTooltip != null)
-            Object.DestroyImmediate(existingTooltip.gameObject);
-
-        // Create tooltip panel.
-        var tooltip = CreateTooltipPanel(prefabRoot.transform, font);
-
-        // Find InventoryUI component (on a child named "InventoryPanel").
+        // Find InventoryUI component (may be on root "InventoryPanel" or nested).
         InventoryUI invUI = null;
         var invPanel = prefabRoot.transform.Find("InventoryPanel");
         if (invPanel != null)
@@ -154,28 +146,40 @@ public static class Phase12PrefabGenerator
         if (invUI == null)
             invUI = prefabRoot.GetComponentInChildren<InventoryUI>();
 
-        if (invUI != null)
-        {
-            var so = new SerializedObject(invUI);
-            so.FindProperty("_tooltip").objectReferenceValue = tooltip;
-            so.FindProperty("_displaySlotCount").intValue = 20;
-
-            // Update slot prefab reference.
-            if (slotPrefab != null)
-                so.FindProperty("_slotPrefab").objectReferenceValue = slotPrefab;
-
-            so.ApplyModifiedPropertiesWithoutUndo();
-            Debug.Log("[Phase12Gen] Wired InventoryUI tooltip + display slot count on GameHUD.");
-        }
-        else
+        if (invUI == null)
         {
             Debug.LogWarning("[Phase12Gen] InventoryUI not found on GameHUD — tooltip not wired.");
+            PrefabUtility.UnloadPrefabContents(prefabRoot);
+            return;
         }
+
+        // If the new HUDPrefabGenerator has already wired a tooltip, don't clobber it.
+        var invSoCheck = new SerializedObject(invUI);
+        if (invSoCheck.FindProperty("_tooltip").objectReferenceValue != null)
+        {
+            Debug.Log("[Phase12Gen] GameHUD InventoryUI already has tooltip wired — skipping.");
+            PrefabUtility.UnloadPrefabContents(prefabRoot);
+            return;
+        }
+
+        // Legacy path: older HUDs were built without a tooltip — add one.
+        var existingTooltip = prefabRoot.transform.Find("ItemTooltip");
+        if (existingTooltip != null)
+            Object.DestroyImmediate(existingTooltip.gameObject);
+
+        var tooltip = CreateTooltipPanel(prefabRoot.transform, font);
+
+        var so = new SerializedObject(invUI);
+        so.FindProperty("_tooltip").objectReferenceValue = tooltip;
+        so.FindProperty("_displaySlotCount").intValue = 20;
+        if (slotPrefab != null)
+            so.FindProperty("_slotPrefab").objectReferenceValue = slotPrefab;
+        so.ApplyModifiedPropertiesWithoutUndo();
 
         PrefabUtility.SaveAsPrefabAsset(prefabRoot, path);
         PrefabUtility.UnloadPrefabContents(prefabRoot);
 
-        Debug.Log("[Phase12Gen] Updated GameHUD.prefab with tooltip panel.");
+        Debug.Log("[Phase12Gen] Added tooltip to legacy GameHUD.prefab.");
     }
 
     // =====================================================================

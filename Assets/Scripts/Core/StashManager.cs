@@ -234,6 +234,58 @@ namespace EverRealm.Exiles.Core
         }
 
         /// <summary>
+        /// Equip an item that currently lives in the player's run inventory
+        /// (used mid-run when the persistent stash isn't accessible).
+        /// Non-equippable items are rejected. If the destination slot is
+        /// occupied, the displaced item swaps back into the run inventory.
+        /// </summary>
+        public bool EquipFromRunInventory(string itemId, Inventory runInventory)
+        {
+            if (runInventory == null) return false;
+
+            var def = _itemRegistry.GetById(itemId);
+            if (def == null || def.EquipSlot == EquipSlot.None) return false;
+
+            int removed = runInventory.Remove(def, 1);
+            if (removed == 0) return false;
+
+            var displaced = _loadout.TryEquip(new ItemStack(def, 1));
+            if (!displaced.IsEmpty && displaced.Definition != null)
+                runInventory.Add(displaced.Definition, displaced.Count);
+
+            Save();
+            OnLoadoutChanged?.Invoke();
+            return true;
+        }
+
+        /// <summary>
+        /// Unequip a loadout slot into the player's run inventory (used mid-run
+        /// when the persistent stash isn't accessible). On success the item
+        /// leaves the loadout and lands in the run bag where it behaves like
+        /// any other picked-up loot — extracted or lost on death.
+        /// Fails and re-equips if the run inventory has no room.
+        /// </summary>
+        public bool UnequipToRunInventory(EquipSlot slot, Inventory runInventory)
+        {
+            if (runInventory == null) return false;
+
+            var item = _loadout.Unequip(slot);
+            if (item.IsEmpty || item.Definition == null) return false;
+
+            int overflow = runInventory.Add(item.Definition, item.Count);
+            if (overflow >= item.Count)
+            {
+                // Run inventory had no room at all — put it back.
+                _loadout.TryEquip(new ItemStack(item.Definition, item.Count));
+                return false;
+            }
+
+            Save();
+            OnLoadoutChanged?.Invoke();
+            return true;
+        }
+
+        /// <summary>
         /// Move an item from the backpack back to stash.
         /// Returns true if an item was moved.
         /// </summary>

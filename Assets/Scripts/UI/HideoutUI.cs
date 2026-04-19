@@ -56,6 +56,11 @@ namespace EverRealm.Exiles.UI
                 _presenter = new StashPresenter(_stash);
                 _presenter.OnRefreshed += OnStashRefreshed;
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                UIDesyncDebugOverlay.EnsureInstance()
+                    .RegisterStashPresenter(_presenter, _stash);
+#endif
+
                 PopulateWeapons();
                 PopulateStats();
             }
@@ -72,6 +77,10 @@ namespace EverRealm.Exiles.UI
         {
             if (_presenter != null)
             {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (UIDesyncDebugOverlay.EnsureInstance() != null)
+                    UIDesyncDebugOverlay.EnsureInstance().UnregisterStashPresenter(_presenter);
+#endif
                 _presenter.OnRefreshed -= OnStashRefreshed;
                 _presenter.Dispose();
             }
@@ -110,16 +119,25 @@ namespace EverRealm.Exiles.UI
 
         private void EnsureStashSlotCount(int needed)
         {
+            if (_stashSlotContainer == null || _stashSlotPrefab == null) return;
+
             while (_slotInstances.Count < needed)
             {
                 var go = Instantiate(_stashSlotPrefab, _stashSlotContainer);
                 var slot = go.GetComponent<InventorySlotUI>();
-                if (slot != null)
+                if (slot == null)
                 {
-                    slot.OnSlotHoverEnter += OnSlotHoverEnter;
-                    slot.OnSlotHoverExit += OnSlotHoverExit;
-                    _slotInstances.Add(slot);
+                    // Guard: without the break this loops forever since the
+                    // pool count never advances.
+                    Debug.LogError(
+                        "[HideoutUI] _stashSlotPrefab is missing InventorySlotUI — aborting pool expansion.");
+                    Destroy(go);
+                    break;
                 }
+
+                slot.OnSlotHoverEnter += OnSlotHoverEnter;
+                slot.OnSlotHoverExit  += OnSlotHoverExit;
+                _slotInstances.Add(slot);
             }
         }
 

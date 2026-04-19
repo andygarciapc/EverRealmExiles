@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.UI;
 using EverRealm.Exiles.Extraction;
 using EverRealm.Exiles.Items;
 using EverRealm.Exiles.Player;
@@ -35,6 +37,10 @@ namespace EverRealm.Exiles.Core
                 return;
             }
             Instance = this;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            UIDesyncDebugOverlay.EnsureInstance();
+#endif
         }
 
         private void Start()
@@ -47,6 +53,8 @@ namespace EverRealm.Exiles.Core
             _runStartTime = Time.time;
             _killCount = 0;
             GameBootstrap.Instance?.SetState(GameState.InRun);
+
+            EnsureEventSystem();
 
             if (_gameHudPrefab != null && _gameHudInstance == null)
                 _gameHudInstance = Instantiate(_gameHudPrefab);
@@ -92,6 +100,18 @@ namespace EverRealm.Exiles.Core
         public void RegisterKill()
         {
             _killCount++;
+        }
+
+        // The Game scene has no EventSystem by default — without one, UI
+        // pointer events never fire and the inventory overlay can't be
+        // clicked. Create one on demand so clicks work regardless of how
+        // the scene was entered.
+        private static void EnsureEventSystem()
+        {
+            if (EventSystem.current != null) return;
+            var go = new GameObject("EventSystem");
+            go.AddComponent<EventSystem>();
+            go.AddComponent<InputSystemUIInputModule>();
         }
 
         /// <param name="success">True if player extracted, false if they died.</param>
@@ -141,8 +161,9 @@ namespace EverRealm.Exiles.Core
 
                 // Clear backpack — items were seeded into PlayerInventory at run start.
                 // On success they're transferred via TransferRunItems; on failure they're lost.
+                // ClearBackpack fires OnLoadoutMutated → Save, and TransferRunItems
+                // already saves on success, so no explicit Save() call is needed here.
                 stash.Loadout.ClearBackpack();
-                stash.Save();
             }
 
             // --- Destroy HUD ---

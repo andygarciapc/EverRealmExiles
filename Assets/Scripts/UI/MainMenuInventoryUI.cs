@@ -64,6 +64,11 @@ namespace EverRealm.Exiles.UI
 
                 _loadoutPresenter = new LoadoutPresenter(_stash);
                 _loadoutPresenter.OnRefreshed += OnLoadoutRefreshed;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                UIDesyncDebugOverlay.EnsureInstance()
+                    .RegisterStashPresenter(_stashPresenter, _stash);
+#endif
             }
 
             _equipSlots = new[]
@@ -80,6 +85,10 @@ namespace EverRealm.Exiles.UI
         {
             if (_stashPresenter != null)
             {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (UIDesyncDebugOverlay.EnsureInstance() != null)
+                    UIDesyncDebugOverlay.EnsureInstance().UnregisterStashPresenter(_stashPresenter);
+#endif
                 _stashPresenter.OnRefreshed -= OnStashRefreshed;
                 _stashPresenter.Dispose();
             }
@@ -289,14 +298,24 @@ namespace EverRealm.Exiles.UI
 
         private void EnsureSlotCount(List<InventorySlotUI> pool, Transform container, int needed)
         {
+            if (container == null || _stashSlotPrefab == null) return;
+
             while (pool.Count < needed)
             {
                 var go = Instantiate(_stashSlotPrefab, container);
                 var slot = go.GetComponent<InventorySlotUI>();
-                if (slot == null) continue;
+                if (slot == null)
+                {
+                    // Guard: a silent `continue` here would spin forever since
+                    // the pool count never advances.
+                    Debug.LogError(
+                        "[MainMenuInventoryUI] _stashSlotPrefab is missing InventorySlotUI — aborting pool expansion.");
+                    Destroy(go);
+                    break;
+                }
 
                 slot.OnSlotHoverEnter += OnSlotHoverEnter;
-                slot.OnSlotHoverExit += OnSlotHoverExit;
+                slot.OnSlotHoverExit  += OnSlotHoverExit;
 
                 // Wire click to the correct handler based on which pool this is.
                 if (pool == _stashSlots)
